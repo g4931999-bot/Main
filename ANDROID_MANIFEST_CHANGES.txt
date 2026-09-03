@@ -1,0 +1,50 @@
+Add this ABOVE the <application> tag in android/app/src/main/AndroidManifest.xml
+(as a sibling of it, both inside <manifest>):
+
+    <!-- Internet + network state - required for all API calls -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+
+    <!-- Real phone push notifications (Android 13 / API 33+ requires this explicitly) -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
+    <!-- Gallery / file access for picking videos, thumbnails, and payment screenshots -->
+    <!-- Android 13+ (API 33+) uses these granular media permissions -->
+    <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+    <!-- Android 12 and below fall back to this one -->
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"
+        android:maxSdkVersion="32" />
+
+--------------------------------------------------------------------------------
+
+Inside the existing <application> tag, find your <activity android:name=".MainActivity" ...>
+block. Two things go inside THAT activity tag:
+
+1) The deep link intent-filter (for "Connect YouTube Channel" returning to the app) —
+   you were already told to add this earlier, confirm it's there:
+
+    <intent-filter>
+        <action android:name="android.intent.action.VIEW" />
+        <category android:name="android.intent.category.DEFAULT" />
+        <category android:name="android.intent.category.BROWSABLE" />
+        <data android:scheme="tubepilot" android:host="oauth-success" />
+    </intent-filter>
+
+2) A default notification channel/icon meta-data (optional but recommended, sits as a
+   sibling of the <activity> tag, inside <application> — uses Flutter's default icon,
+   change android:resource if you add a custom notification icon later):
+
+    <meta-data
+        android:name="com.google.firebase.messaging.default_notification_channel_id"
+        android:value="tubepilot_default" />
+    <meta-data
+        android:name="com.google.firebase.messaging.default_notification_icon"
+        android:resource="@mipmap/ic_launcher" />
+
+--------------------------------------------------------------------------------
+
+NOTE: Location/GPS permission is NOT added here on purpose — nothing in Tube Pilot
+uses the phone's location, so requesting it would only prompt users for access you
+don't need. If you did mean something specific by "GPS", tell me what feature needs
+it and I'll add the right permission for that instead.

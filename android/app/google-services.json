@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "348714273929",
+    "project_id": "tubepilot-01",
+    "storage_bucket": "tubepilot-01.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:348714273929:android:7e750bd94058ae0bca8a58",
+        "android_client_info": {
+          "package_name": "com.tubepilot.app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "348714273929-bfm6hjdiqrmg5frgeseg103351onbvao.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.tubepilot.app",
+            "certificate_hash": "59b8c9ce9bc2f04b35549a7ad2e7c1f1db672671"
+          }
+        },
+        {
+          "client_id": "348714273929-gaopmum3t87momtn46etsbiafkkopqoa.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD1IiEj3iozgpBb7ngzlvYLUHRV06ygb5I"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "348714273929-gaopmum3t87momtn46etsbiafkkopqoa.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

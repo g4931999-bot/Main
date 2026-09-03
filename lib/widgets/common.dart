@@ -1,0 +1,298 @@
+import 'package:flutter/material.dart';
+import '../theme/app_theme.dart';
+
+// ---------------- Toast ----------------
+void showToast(BuildContext context, String message, {bool isError = false, bool isSuccess = false}) {
+  final color = isError ? AppColors.red : (isSuccess ? AppColors.green : Theme.of(context).colorScheme.surface);
+  ScaffoldMessenger.of(context).hideCurrentSnackBar();
+  ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(
+      behavior: SnackBarBehavior.floating,
+      backgroundColor: isError || isSuccess ? color.withOpacity(0.15) : null,
+      content: Text(
+        message,
+        style: TextStyle(color: isError ? AppColors.red : (isSuccess ? AppColors.green : null)),
+      ),
+      duration: const Duration(seconds: 3),
+    ),
+  );
+}
+
+void showApiError(BuildContext context, Object err) {
+  showToast(context, err.toString().replaceFirst('ApiException: ', ''), isError: true);
+}
+
+// User-friendly fallback for AI generation failures specifically (Groq
+// model errors, timeouts, rate limits) — the raw error can be a technical
+// message like "Groq API error (404): ..." which isn't meaningful to a
+// creator tapping "Generate". Shows a plain retry-oriented message instead,
+// while insufficient-diamonds errors still surface their real (useful) text.
+void showAiError(BuildContext context, Object err) {
+  final raw = err.toString().replaceFirst('ApiException: ', '');
+  final isCreditIssue = raw.toLowerCase().contains('diamond') || raw.toLowerCase().contains('insufficient');
+  showToast(
+    context,
+    isCreditIssue ? raw : 'AI generation is temporarily unavailable — please try again in a moment.',
+    isError: true,
+  );
+}
+
+// ---------------- Gradient Button ----------------
+class GradientButton extends StatelessWidget {
+  final String label;
+  final VoidCallback? onPressed;
+  final bool loading;
+  final IconData? icon;
+
+  const GradientButton({super.key, required this.label, this.onPressed, this.loading = false, this.icon});
+
+  @override
+  Widget build(BuildContext context) {
+    return Opacity(
+      opacity: onPressed == null && !loading ? 0.6 : 1,
+      child: Container(
+        decoration: BoxDecoration(
+          gradient: AppColors.gradient,
+          borderRadius: BorderRadius.circular(14),
+          boxShadow: [BoxShadow(color: AppColors.purple.withOpacity(0.35), blurRadius: 18, offset: const Offset(0, 8))],
+        ),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(14),
+            onTap: loading ? null : onPressed,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 15),
+              child: Center(
+                child: loading
+                    ? const SizedBox(
+                        width: 20, height: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2.4, color: Colors.white),
+                      )
+                    : Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (icon != null) ...[Icon(icon, color: Colors.white, size: 18), const SizedBox(width: 8)],
+                          Text(label, style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w700)),
+                        ],
+                      ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ---------------- Badge ----------------
+class AppBadge extends StatelessWidget {
+  final String label;
+  final Color color;
+  const AppBadge({super.key, required this.label, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+      decoration: BoxDecoration(color: color.withOpacity(0.15), borderRadius: BorderRadius.circular(999)),
+      child: Text(label, style: TextStyle(color: color, fontSize: 11, fontWeight: FontWeight.w700)),
+    );
+  }
+}
+
+// ---------------- Balance Banner ----------------
+class BalanceBanner extends StatelessWidget {
+  final int balance;
+  final VoidCallback onBuy;
+  const BalanceBanner({super.key, required this.balance, required this.onBuy});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(gradient: AppColors.gradient, borderRadius: BorderRadius.circular(18)),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('Diamond Balance', style: TextStyle(color: Colors.white70, fontSize: 12.5)),
+              const SizedBox(height: 4),
+              Row(children: [
+                const Text('💎 ', style: TextStyle(fontSize: 20)),
+                Text('$balance', style: const TextStyle(color: Colors.white, fontSize: 26, fontWeight: FontWeight.w800)),
+              ]),
+            ],
+          ),
+          ElevatedButton(
+            onPressed: onBuy,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.white.withOpacity(0.22),
+              foregroundColor: Colors.white,
+              elevation: 0,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
+              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+            ),
+            child: const Text('+ Buy', style: TextStyle(fontWeight: FontWeight.w700)),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ---------------- Stat Card ----------------
+class StatCard extends StatelessWidget {
+  final String label;
+  final String value;
+  final String? change;
+  const StatCard({super.key, required this.label, required this.value, this.change});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface,
+        border: Border.all(color: context.surfaces.border),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label, style: TextStyle(color: context.surfaces.textDim, fontSize: 12)),
+          const SizedBox(height: 6),
+          Text(value, style: const TextStyle(fontSize: 21, fontWeight: FontWeight.w800)),
+          if (change != null) ...[
+            const SizedBox(height: 2),
+            Text(change!, style: const TextStyle(color: AppColors.green, fontSize: 11.5)),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+// ---------------- Bottom Nav (floating pill, icon-only) ----------------
+// Same 5 tabs, same tap behavior as before. Text labels removed per request —
+// only icons are shown now, with a Tooltip carrying the label for accessibility
+// (long-press / screen readers still get the name, sighted users just see icons).
+class AppBottomNav extends StatelessWidget {
+  final int currentIndex;
+  final Function(int) onTap;
+  const AppBottomNav({super.key, required this.currentIndex, required this.onTap});
+
+  static const List<({IconData filled, IconData outline, String label})> _items = [
+    (filled: Icons.home_rounded, outline: Icons.home_outlined, label: 'Home'),
+    (filled: Icons.cloud_upload_rounded, outline: Icons.cloud_upload_outlined, label: 'Upload'),
+    (filled: Icons.video_collection_rounded, outline: Icons.video_collection_outlined, label: 'Videos'),
+    (filled: Icons.insights_rounded, outline: Icons.insights_outlined, label: 'Analytics'),
+    (filled: Icons.person_rounded, outline: Icons.person_outline_rounded, label: 'Profile'),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Material(
+      color: Colors.transparent,
+      child: SafeArea(
+        minimum: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+        child: Container(
+          height: 62,
+          padding: const EdgeInsets.symmetric(horizontal: 6),
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.surface,
+            borderRadius: BorderRadius.circular(31),
+            border: Border.all(color: context.surfaces.border),
+            boxShadow: [
+              BoxShadow(
+                color: isDark ? Colors.black.withOpacity(0.6) : AppColors.purple.withOpacity(0.14),
+                blurRadius: 22,
+                offset: const Offset(0, 10),
+              ),
+            ],
+          ),
+          child: Row(
+            children: List.generate(_items.length, (i) {
+              final item = _items[i];
+              final selected = i == currentIndex;
+              return Expanded(
+                child: Tooltip(
+                  message: item.label,
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: () => onTap(i),
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 220),
+                      curve: Curves.easeOut,
+                      margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: selected ? AppColors.purple.withOpacity(isDark ? 0.25 : 0.12) : Colors.transparent,
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Icon(
+                        selected ? item.filled : item.outline,
+                        color: selected ? AppColors.purple : context.surfaces.textDim,
+                        size: 23,
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            }),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ---------------- Loading / Empty states ----------------
+class LoadingView extends StatelessWidget {
+  const LoadingView({super.key});
+  @override
+  Widget build(BuildContext context) => const Center(child: CircularProgressIndicator(color: AppColors.purple));
+}
+
+class EmptyView extends StatelessWidget {
+  final String message;
+  final IconData icon;
+  const EmptyView({super.key, required this.message, this.icon = Icons.inbox_outlined});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.all(30),
+      child: Column(
+        children: [
+          Icon(icon, size: 40, color: context.surfaces.textDim),
+          const SizedBox(height: 10),
+          Text(message, style: TextStyle(color: context.surfaces.textDim), textAlign: TextAlign.center),
+        ],
+      ),
+    );
+  }
+}
+
+String formatDateTime(String? iso) {
+  if (iso == null) return '';
+  final d = DateTime.tryParse(iso);
+  if (d == null) return '';
+  final local = d.toLocal();
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  final hour12 = local.hour % 12 == 0 ? 12 : local.hour % 12;
+  final ampm = local.hour >= 12 ? 'PM' : 'AM';
+  final minute = local.minute.toString().padLeft(2, '0');
+  return '${local.day} ${months[local.month - 1]} - $hour12:$minute $ampm';
+}
+
+String formatDate(String? iso) {
+  if (iso == null) return '';
+  final d = DateTime.tryParse(iso);
+  if (d == null) return '';
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  return '${d.day} ${months[d.month - 1]} ${d.year}';
+}
