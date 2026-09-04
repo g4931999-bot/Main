@@ -4,6 +4,7 @@ import '../services/api_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/common.dart';
 import '../providers/language_provider.dart';
+import 'notifications_screen.dart';
 
 class AnalyticsScreen extends StatefulWidget {
   final bool embedded;
@@ -14,6 +15,7 @@ class AnalyticsScreen extends StatefulWidget {
 
 class _AnalyticsScreenState extends State<AnalyticsScreen> {
   Map<String, dynamic>? analytics;
+  int unreadCount = 0;
   bool loading = true;
 
   @override
@@ -25,8 +27,14 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
   Future<void> _load({bool showLoader = true}) async {
     if (showLoader) setState(() => loading = true);
     try {
-      final res = await ApiService.instance.getAnalytics();
-      setState(() => analytics = res['analytics']);
+      final results = await Future.wait([
+        ApiService.instance.getAnalytics(),
+        ApiService.instance.getNotifications().catchError((_) => <String, dynamic>{}),
+      ]);
+      setState(() {
+        analytics = results[0]['analytics'];
+        unreadCount = (results[1]['unreadCount'] as num?)?.toInt() ?? 0;
+      });
     } catch (e) {
       if (mounted) showApiError(context, e);
     } finally {
@@ -34,19 +42,89 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
     }
   }
 
+  void _showHelp() {
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: Text(context.tr('analytics_help_title')),
+        content: Text(context.tr('analytics_help_body')),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: Text(context.tr('ok_btn'))),
+        ],
+      ),
+    );
+  }
+
+  int get _diamondCostPerUpload {
+    final cost = analytics?['diamondCostPerUpload'] ?? analytics?['uploadCostDiamonds'];
+    if (cost is num && cost > 0) return cost.toInt();
+    return 10;
+  }
+
   @override
   Widget build(BuildContext context) {
     final trend = (analytics?['uploadTrend'] as List?) ?? [];
     final activity = (analytics?['recentActivity'] as List?) ?? [];
+    final diamondBalance = (analytics?['remainingUploadCredits'] ?? 0) as num;
+    final worthUploads = diamondBalance ~/ _diamondCostPerUpload;
 
     return Scaffold(
-      appBar: AppBar(title: Text(context.tr('analytics_title'))),
+      appBar: AppBar(
+        automaticallyImplyLeading: !widget.embedded,
+        titleSpacing: 20,
+        toolbarHeight: 64,
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(context.tr('analytics_title'), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 22)),
+            Text(context.tr('analytics_subtitle'), style: TextStyle(color: context.surfaces.textDim, fontSize: 12.5, fontWeight: FontWeight.w500)),
+          ],
+        ),
+        actions: [
+          Stack(
+            clipBehavior: Clip.none,
+            children: [
+              IconButton(
+                icon: const Icon(Icons.notifications_outlined),
+                onPressed: () => Navigator.of(context)
+                    .push(MaterialPageRoute(builder: (_) => const NotificationsScreen()))
+                    .then((_) => _load(showLoader: false)),
+              ),
+              if (unreadCount > 0)
+                Positioned(
+                  right: 8,
+                  top: 8,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                    decoration: const BoxDecoration(color: AppColors.red, shape: BoxShape.circle),
+                    constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
+                    child: Text('$unreadCount', textAlign: TextAlign.center, style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w700)),
+                  ),
+                ),
+            ],
+          ),
+          Padding(
+            padding: const EdgeInsets.only(right: 12),
+            child: GestureDetector(
+              onTap: _showHelp,
+              child: Container(
+                width: 34,
+                height: 34,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(color: AppColors.purple, shape: BoxShape.circle),
+                child: const Icon(Icons.question_mark_rounded, color: Colors.white, size: 16),
+              ),
+            ),
+          ),
+        ],
+      ),
       body: loading
           ? const LoadingView()
           : RefreshIndicator(
               onRefresh: () => _load(showLoader: false),
               child: ListView(
-                padding: const EdgeInsets.fromLTRB(20, 20, 20, 110),
+                padding: const EdgeInsets.fromLTRB(20, 8, 20, 110),
                 children: [
                   GridView.count(
                     crossAxisCount: 2,
@@ -56,10 +134,30 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                     crossAxisSpacing: 12,
                     childAspectRatio: 1.5,
                     children: [
-                      _statCard(context, Icons.cloud_done_rounded, context.tr('total_uploaded'), '${analytics?['uploadCount'] ?? 0}'),
-                      _statCard(context, Icons.card_giftcard_rounded, context.tr('free_uploads_left'), '${analytics?['freeUploadsLeft'] ?? 0}'),
-                      _statCard(context, Icons.diamond_rounded, context.tr('diamond_balance'), '${analytics?['remainingUploadCredits'] ?? 0}'),
-                      _statCard(context, Icons.schedule_rounded, context.tr('scheduled_queue'), '${analytics?['scheduledQueue'] ?? 0}'),
+                      _MetricCard(
+                        icon: Icons.cloud_upload_rounded,
+                        label: context.tr('free_uploads_left'),
+                        value: '${analytics?['freeUploadsLeft'] ?? 0}',
+                        subtitle: context.tr('resets_30_days'),
+                      ),
+                      _MetricCard(
+                        icon: Icons.diamond_rounded,
+                        label: context.tr('diamond_balance'),
+                        value: '$diamondBalance',
+                        subtitle: worthUploads > 0 ? context.tr('diamonds_worth_uploads').replaceAll('%d', '$worthUploads') : null,
+                      ),
+                      _MetricCard(
+                        icon: Icons.play_circle_fill_rounded,
+                        label: context.tr('videos_published'),
+                        value: '${analytics?['uploadCount'] ?? 0}',
+                        subtitle: context.tr('total_videos'),
+                      ),
+                      _MetricCard(
+                        icon: Icons.event_available_rounded,
+                        label: context.tr('scheduled_videos'),
+                        value: '${analytics?['scheduledQueue'] ?? 0}',
+                        subtitle: context.tr('this_month'),
+                      ),
                     ],
                   ),
                   const SizedBox(height: 20),
@@ -71,12 +169,20 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(context.tr('uploads_last_14_days'), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Expanded(
+                              child: Text(context.tr('uploads_last_14_days'), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+                            ),
+                            _periodDropdown(context),
+                          ],
+                        ),
                         const SizedBox(height: 4),
                         Text(context.tr('uploads_consistency_subtitle'), style: TextStyle(color: context.surfaces.textDim, fontSize: 11.5)),
                         const SizedBox(height: 16),
                         SizedBox(
-                          height: 140,
+                          height: 160,
                           child: trend.isEmpty ? _emptyChartPlaceholder(context) : _buildTrendChart(context, trend),
                         ),
                         const SizedBox(height: 4),
@@ -86,26 +192,43 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                   const SizedBox(height: 16),
 
                   Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(border: Border.all(color: context.surfaces.border), borderRadius: BorderRadius.circular(16)),
-                    child: Column(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(color: AppColors.red.withOpacity(0.06), border: Border.all(color: AppColors.red.withOpacity(0.25)), borderRadius: BorderRadius.circular(16)),
+                    child: Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                          Text(context.tr('failed_uploads'), style: const TextStyle(fontWeight: FontWeight.w700)),
-                          AppBadge(label: '${analytics?['failedUploads'] ?? 0}', color: AppColors.red),
-                        ]),
-                        const SizedBox(height: 10),
-                        Text(
-                          context.tr('analytics_placeholder_note'),
-                          style: TextStyle(color: context.surfaces.textDim, fontSize: 12.5),
+                        Container(
+                          width: 40,
+                          height: 40,
+                          alignment: Alignment.center,
+                          decoration: BoxDecoration(color: AppColors.red.withOpacity(0.14), borderRadius: BorderRadius.circular(12)),
+                          child: const Icon(Icons.warning_amber_rounded, color: AppColors.red, size: 20),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(context.tr('failed_uploads'), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+                              const SizedBox(height: 4),
+                              Text(context.tr('analytics_placeholder_note'), style: TextStyle(color: context.surfaces.textDim, fontSize: 12)),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Container(
+                          width: 30,
+                          height: 30,
+                          alignment: Alignment.center,
+                          decoration: const BoxDecoration(color: AppColors.red, shape: BoxShape.circle),
+                          child: Text('${analytics?['failedUploads'] ?? 0}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 12)),
                         ),
                       ],
                     ),
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 20),
 
-                  // ---------------- Recent activity / usage record ----------------
+                  // ---------------- Recent activity ----------------
                   Text(context.tr('recent_activity'), style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
                   const SizedBox(height: 10),
                   if (activity.isEmpty)
@@ -115,42 +238,37 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                       child: Text(context.tr('no_activity_yet'), style: TextStyle(color: context.surfaces.textDim, fontSize: 13)),
                     )
                   else
-                    ...activity.map((a) => _activityRow(context, a as Map<String, dynamic>)),
+                    Container(
+                      decoration: BoxDecoration(border: Border.all(color: context.surfaces.border), borderRadius: BorderRadius.circular(16)),
+                      child: Column(
+                        children: List.generate(activity.length, (i) {
+                          final a = activity[i] as Map<String, dynamic>;
+                          final isLast = i == activity.length - 1;
+                          return Column(children: [_activityRow(context, a), if (!isLast) Divider(height: 1, color: context.surfaces.border)]);
+                        }),
+                      ),
+                    ),
                 ],
               ),
             ),
     );
   }
 
-  Widget _statCard(BuildContext context, IconData icon, String label, String value) {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: context.surfaces.card2,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [BoxShadow(color: AppColors.purple.withOpacity(0.06), blurRadius: 10, offset: const Offset(0, 4))],
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          Container(
-            width: 38, height: 38,
-            decoration: BoxDecoration(color: AppColors.purple.withOpacity(0.14), borderRadius: BorderRadius.circular(12)),
-            child: Icon(icon, color: AppColors.purple, size: 19),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(label, style: TextStyle(color: context.surfaces.textDim, fontSize: 11.5), maxLines: 1, overflow: TextOverflow.ellipsis),
-                const SizedBox(height: 2),
-                Text(value, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800)),
-              ],
-            ),
-          ),
-        ],
+  Widget _periodDropdown(BuildContext context) {
+    return PopupMenuButton<String>(
+      itemBuilder: (_) => [PopupMenuItem(value: '14d', child: Text(context.tr('uploads_last_14_days')))],
+      onSelected: (_) {},
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(border: Border.all(color: context.surfaces.border), borderRadius: BorderRadius.circular(999)),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(context.tr('uploads_last_14_days'), style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600)),
+            const SizedBox(width: 4),
+            Icon(Icons.keyboard_arrow_down_rounded, size: 16, color: context.surfaces.textDim),
+          ],
+        ),
       ),
     );
   }
@@ -164,18 +282,25 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
   Widget _buildTrendChart(BuildContext context, List trend) {
     final counts = trend.map((t) => (t['count'] as num?)?.toDouble() ?? 0).toList();
     final maxY = (counts.isEmpty ? 1.0 : counts.reduce((a, b) => a > b ? a : b));
-    final barMaxY = maxY < 4 ? 4.0 : maxY + 1;
+    final chartMaxY = maxY < 4 ? 4.0 : maxY + 2;
 
-    return BarChart(
-      BarChartData(
-        maxY: barMaxY,
-        alignment: BarChartAlignment.spaceBetween,
-        gridData: const FlGridData(show: false),
+    return LineChart(
+      LineChartData(
+        minY: 0,
+        maxY: chartMaxY,
+        gridData: FlGridData(show: true, drawVerticalLine: false, horizontalInterval: chartMaxY / 4, getDrawingHorizontalLine: (_) => FlLine(color: context.surfaces.border, strokeWidth: 1)),
         borderData: FlBorderData(show: false),
         titlesData: FlTitlesData(
-          leftTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
           rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
           topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+          leftTitles: AxisTitles(
+            sideTitles: SideTitles(
+              showTitles: true,
+              reservedSize: 26,
+              interval: chartMaxY / 4 == 0 ? 1 : chartMaxY / 4,
+              getTitlesWidget: (value, meta) => Text('${value.toInt()}', style: TextStyle(color: context.surfaces.textDim, fontSize: 9.5)),
+            ),
+          ),
           bottomTitles: AxisTitles(
             sideTitles: SideTitles(
               showTitles: true,
@@ -183,94 +308,138 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
               getTitlesWidget: (value, meta) {
                 final i = value.toInt();
                 if (i < 0 || i >= trend.length) return const SizedBox.shrink();
-                // Only label every other day to avoid crowding
                 if (i % 2 != 0) return const SizedBox.shrink();
                 final dateStr = trend[i]['date'] as String;
                 final d = DateTime.tryParse(dateStr);
                 final label = d == null ? '' : '${d.day}/${d.month}';
-                return Padding(
-                  padding: const EdgeInsets.only(top: 6),
-                  child: Text(label, style: TextStyle(color: context.surfaces.textDim, fontSize: 9.5)),
-                );
+                return Padding(padding: const EdgeInsets.only(top: 6), child: Text(label, style: TextStyle(color: context.surfaces.textDim, fontSize: 9.5)));
               },
             ),
           ),
         ),
-        barGroups: List.generate(trend.length, (i) {
-          final count = counts[i];
-          return BarChartGroupData(
-            x: i,
-            barRods: [
-              BarChartRodData(
-                toY: count,
-                width: 10,
-                borderRadius: BorderRadius.circular(4),
-                gradient: LinearGradient(
-                  begin: Alignment.bottomCenter,
-                  end: Alignment.topCenter,
-                  colors: count > 0 ? [AppColors.purpleLight, AppColors.purple] : [context.surfaces.border, context.surfaces.border],
-                ),
+        lineTouchData: const LineTouchData(enabled: true),
+        lineBarsData: [
+          LineChartBarData(
+            isCurved: true,
+            barWidth: 2.5,
+            color: AppColors.purple,
+            dotData: FlDotData(
+              show: true,
+              getDotPainter: (spot, percent, bar, index) => FlDotCirclePainter(radius: 3.5, color: AppColors.purple, strokeWidth: 0),
+            ),
+            belowBarData: BarAreaData(
+              show: true,
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [AppColors.purple.withOpacity(0.28), AppColors.purple.withOpacity(0.02)],
               ),
-            ],
-          );
-        }),
+            ),
+            spots: List.generate(counts.length, (i) => FlSpot(i.toDouble(), counts[i])),
+          ),
+        ],
       ),
     );
   }
 
   Widget _activityRow(BuildContext context, Map<String, dynamic> a) {
     final usedFreeUpload = a['usedFreeUpload'] == true;
-    final diamondsCharged = a['diamondsCharged'] ?? 0;
-    final status = a['status'] ?? '';
+    final diamondsCharged = (a['diamondsCharged'] ?? 0) as num;
+    final status = (a['status'] ?? '').toString();
     final title = a['title'] ?? '';
     final date = a['createdAt'] as String?;
 
-    final statusColor = status == 'uploaded'
-        ? AppColors.green
-        : status == 'failed'
-            ? AppColors.red
-            : AppColors.diamond;
+    late final String emoji;
+    late final String headline;
+    late final Color color;
+    if (status == 'failed') {
+      emoji = '⚠️';
+      headline = context.tr('activity_upload_failed');
+      color = AppColors.red;
+    } else if (status == 'uploaded') {
+      emoji = '✅';
+      headline = context.tr('activity_video_uploaded');
+      color = AppColors.green;
+    } else {
+      emoji = '📤';
+      headline = context.tr('activity_upload_queued');
+      color = AppColors.purple;
+    }
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(border: Border.all(color: context.surfaces.border), borderRadius: BorderRadius.circular(14)),
-      child: Row(
-        children: [
-          Container(
-            width: 40, height: 40,
-            decoration: BoxDecoration(color: statusColor.withOpacity(0.14), borderRadius: BorderRadius.circular(10)),
-            child: Icon(
-              usedFreeUpload ? Icons.card_giftcard_rounded : Icons.diamond_rounded,
-              color: statusColor,
-              size: 18,
+    final subtitle = usedFreeUpload
+        ? context.tr('used_free_upload')
+        : (diamondsCharged > 0 ? context.tr('spent_diamonds').replaceAll('%d', '$diamondsCharged') : (title.toString().isNotEmpty ? title.toString() : context.tr('no_charge')));
+
+    return ListTile(
+      dense: true,
+      leading: Container(
+        width: 34,
+        height: 34,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(color: color.withOpacity(0.14), borderRadius: BorderRadius.circular(10)),
+        child: Text(emoji, style: const TextStyle(fontSize: 15)),
+      ),
+      title: Text(headline, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700), maxLines: 1, overflow: TextOverflow.ellipsis),
+      subtitle: Text(subtitle, style: TextStyle(color: context.surfaces.textDim, fontSize: 11.5), maxLines: 2, overflow: TextOverflow.ellipsis),
+      trailing: Text(_timeAgo(date), style: TextStyle(color: context.surfaces.textDim, fontSize: 10.5)),
+    );
+  }
+
+  // Local "x ago" formatter — kept here rather than assuming a shared
+  // helper exists in widgets/common.dart (that file wasn't provided).
+  String _timeAgo(String? iso) {
+    if (iso == null) return '';
+    final d = DateTime.tryParse(iso);
+    if (d == null) return '';
+    final diff = DateTime.now().difference(d);
+    if (diff.inSeconds < 60) return context.tr('time_just_now');
+    if (diff.inMinutes < 60) return '${diff.inMinutes}m ${context.tr('time_ago_suffix')}';
+    if (diff.inHours < 24) return '${diff.inHours}h ${context.tr('time_ago_suffix')}';
+    if (diff.inDays < 7) return '${diff.inDays}d ${context.tr('time_ago_suffix')}';
+    return '${d.day}/${d.month}/${d.year}';
+  }
+}
+
+class _MetricCard extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String value;
+  final String? subtitle;
+  final VoidCallback? onTap;
+  const _MetricCard({required this.icon, required this.label, required this.value, this.subtitle, this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: context.surfaces.card2,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [BoxShadow(color: AppColors.purple.withOpacity(0.06), blurRadius: 10, offset: const Offset(0, 4))],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 34,
+              height: 34,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(color: AppColors.purple.withOpacity(0.14), borderRadius: BorderRadius.circular(10)),
+              child: Icon(icon, color: AppColors.purple, size: 17),
             ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5)),
-                const SizedBox(height: 3),
-                Text(
-                  usedFreeUpload
-                      ? context.tr('used_free_upload')
-                      : (diamondsCharged > 0 ? context.tr('spent_diamonds').replaceAll('%d', '$diamondsCharged') : context.tr('no_charge')),
-                  style: TextStyle(color: context.surfaces.textDim, fontSize: 11.5),
-                ),
-              ],
-            ),
-          ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              AppBadge(label: status, color: statusColor),
-              const SizedBox(height: 4),
-              Text(formatDate(date), style: TextStyle(color: context.surfaces.textDim, fontSize: 10.5)),
+            const SizedBox(height: 8),
+            Text(label, style: TextStyle(color: context.surfaces.textDim, fontSize: 11.5), maxLines: 1, overflow: TextOverflow.ellipsis),
+            const SizedBox(height: 2),
+            Text(value, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
+            if (subtitle != null) ...[
+              const SizedBox(height: 1),
+              Text(subtitle!, style: TextStyle(color: context.surfaces.textDim, fontSize: 10.5), maxLines: 1, overflow: TextOverflow.ellipsis),
             ],
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

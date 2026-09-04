@@ -89,7 +89,7 @@ class CustomDropdown<T> extends StatelessWidget {
     final itemTextColor = isDark ? Colors.white : Colors.black;
 
     return DropdownButtonFormField<T>(
-      initialValue: value,
+      value: value,
       isExpanded: true,
       icon: const Icon(Icons.keyboard_arrow_down_rounded, color: AppColors.purple),
       borderRadius: BorderRadius.circular(20),

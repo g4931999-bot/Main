@@ -98,58 +98,6 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
 
   void _invalidatePayments() => paymentsLoadedStatuses.clear();
 
-  // ⚠️ NOTE: with Cashfree, payments normally auto-approve themselves the
-  // moment the backend confirms order_status === 'PAID' (see routes/diamond.js
-  // verify-payment / webhook) — a transaction only sits here as 'pending'
-  // if the user abandoned checkout or closed the app before either of
-  // those could run. This manual Approve button still works (it force-
-  // credits diamonds directly), but should only be used if you've
-  // independently confirmed the payment actually went through — it does
-  // NOT re-check anything with Cashfree itself.
-  Future<void> _approve(String id) async {
-    try {
-      await ApiService.instance.approvePayment(id);
-      if (mounted) showToast(context, 'Approved — diamonds credited', isSuccess: true);
-      _invalidatePayments();
-      _loadAll();
-    } catch (e) {
-      if (mounted) showApiError(context, e);
-    }
-  }
-
-  Future<void> _reject(String id) async {
-    final ctrl = TextEditingController();
-    final note = await showDialog<String>(
-      context: context,
-      builder: (_) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-        title: const Text('Reject payment'),
-        content: TextField(
-          controller: ctrl,
-          decoration: const InputDecoration(hintText: 'Reason (optional)'),
-          autofocus: true,
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
-          FilledButton.tonal(
-            style: FilledButton.styleFrom(backgroundColor: AppColors.red.withOpacity(0.15), foregroundColor: AppColors.red),
-            onPressed: () => Navigator.pop(context, ctrl.text),
-            child: const Text('Reject'),
-          ),
-        ],
-      ),
-    );
-    if (note == null) return;
-    try {
-      await ApiService.instance.rejectPayment(id, note);
-      if (mounted) showToast(context, 'Payment rejected');
-      _invalidatePayments();
-      _loadAll();
-    } catch (e) {
-      if (mounted) showApiError(context, e);
-    }
-  }
-
   // ---------------- Users tab ----------------
   List<dynamic> users = [];
   bool usersLoading = false;
@@ -345,7 +293,7 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
           ],
         ),
         bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(52),
+          preferredSize: const Size.fromHeight(48),
           child: Container(
             margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
             decoration: BoxDecoration(
@@ -362,22 +310,17 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
                 gradient: LinearGradient(colors: [AppColors.purple, AppColors.purple.withOpacity(0.75)]),
               ),
               dividerColor: Colors.transparent,
-              labelPadding: const EdgeInsets.symmetric(horizontal: 2, vertical: 4),
               labelColor: Colors.white,
               unselectedLabelColor: context.surfaces.textDim,
-              labelStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700),
-              unselectedLabelStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
+              // Icon-only tabs — no more label text to truncate ("Approv…",
+              // "Gift Co…"), the tooltip on long-press still carries the
+              // full name for accessibility.
               tabs: List.generate(tabLabels.length, (i) {
                 return Tab(
-                  height: 44,
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(tabIcons[i], size: 14),
-                      const SizedBox(width: 4),
-                      Flexible(child: Text(tabLabels[i], overflow: TextOverflow.ellipsis)),
-                    ],
+                  height: 40,
+                  child: Tooltip(
+                    message: tabLabels[i],
+                    child: Icon(tabIcons[i], size: 19),
                   ),
                 );
               }),
@@ -490,14 +433,16 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
                 ),
             ],
           ),
-          // Cashfree auto-confirms and auto-credits payments itself (see
-          // routes/diamond.js verify-payment / webhook) — a transaction only
-          // ends up sitting here as 'pending' if the user abandoned
-          // checkout or closed the app before either could run.
+          // Fully automatic now — a background job (routes/diamond.js,
+          // autoCheckPendingOrders) re-checks every pending order with
+          // Cashfree every 60s and credits diamonds itself the moment it
+          // sees PAID, on top of the app's own poll and the webhook. No
+          // admin action is ever required; anything genuinely abandoned
+          // auto-expires after 24h.
           if (status == 'pending') ...[
             const SizedBox(height: 4),
             Text(
-              'Cashfree auto-confirms payments — these are stuck/abandoned orders only. Approve here only if you\'ve verified the payment yourself.',
+              'Fully automatic — these are re-checked with Cashfree every minute and credited the moment they\'re paid. No action needed.',
               style: TextStyle(color: context.surfaces.textDim, fontSize: 11),
             ),
           ],
@@ -600,36 +545,26 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
             ),
           ),
           if (status == 'pending') ...[
-            const SizedBox(height: 12),
-            Row(children: [
-              Expanded(
-                child: ElevatedButton.icon(
-                  onPressed: () => _approve(t['_id']),
-                  icon: const Icon(Icons.check, size: 16),
-                  label: const Text('Approve'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.green,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 11),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  ),
+            const SizedBox(height: 10),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(color: AppColors.diamond.withOpacity(0.14), borderRadius: BorderRadius.circular(20)),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    SizedBox(
+                      width: 11,
+                      height: 11,
+                      child: CircularProgressIndicator(strokeWidth: 1.6, color: AppColors.diamond),
+                    ),
+                    const SizedBox(width: 6),
+                    Text('auto-checking', style: TextStyle(color: AppColors.diamond, fontSize: 11.5, fontWeight: FontWeight.w700)),
+                  ],
                 ),
               ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: () => _reject(t['_id']),
-                  icon: const Icon(Icons.close, size: 16),
-                  label: const Text('Reject'),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: AppColors.red,
-                    side: const BorderSide(color: AppColors.red),
-                    padding: const EdgeInsets.symmetric(vertical: 11),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  ),
-                ),
-              ),
-            ]),
+            ),
           ] else
             Padding(
               padding: const EdgeInsets.only(top: 10),

@@ -8,11 +8,13 @@ import 'upload_screen.dart';
 import 'upcoming_screen.dart';
 import 'analytics_screen.dart';
 import 'profile_screen.dart';
-import 'diamond_store_screen.dart';
 import 'wallet_screen.dart';
 import 'notifications_screen.dart';
 import 'preview_screen.dart';
 import 'rate_us_screen.dart';
+import 'ai_ideas_screen.dart';
+import 'ai_title_description_screen.dart';
+import 'channel_audit_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -56,6 +58,7 @@ class _DashboardHomeState extends State<_DashboardHome> {
   Map<String, dynamic>? facebookStatus;
 
   List<Map<String, dynamic>> upcomingEvents = [];
+  List<Map<String, dynamic>> recentVideos = [];
 
   bool loading = true;
 
@@ -76,32 +79,20 @@ class _DashboardHomeState extends State<_DashboardHome> {
         ApiService.instance.getYoutubeChannel().catchError((_) => <String, dynamic>{}),
         ApiService.instance.getMetaStatus().catchError((_) => <String, dynamic>{}),
         ApiService.instance.listVideos(status: 'queued').catchError((_) => <String, dynamic>{}),
+        // Real recently-published videos, used to render the "Recent
+        // Activity" thumbnail list — same listVideos() call the queued
+        // fetch below already uses, just filtered to 'uploaded' status.
+        ApiService.instance.listVideos(status: 'uploaded').catchError((_) => <String, dynamic>{}),
       ]);
 
       final dash = results[0]['data'];
       final notifRes = results[1];
       final ytRes = results[2];
       final metaRes = results[3];
-      final videosRes = results[4];
+      final queuedRes = results[4];
+      final uploadedRes = results[5];
 
-      final events = <Map<String, dynamic>>[];
-      final videos = (videosRes['videos'] as List?) ?? [];
-      for (final v in videos) {
-        final platforms = (v['platforms'] as List?) ?? [];
-        for (final p in platforms) {
-          if (p['status'] != 'pending' && p['status'] != 'queued') continue;
-          events.add({
-            'videoId': v['_id'],
-            'platform': p['platform'],
-            'title': p['platform'] == 'youtube'
-                ? (p['title'] ?? 'Untitled')
-                : ((p['caption'] ?? '').toString().isNotEmpty ? p['caption'] : 'Untitled'),
-            'scheduledAt': p['scheduledAt'],
-            'thumbnailUrl': p['thumbnailUrl'] ?? '',
-            'status': p['status'],
-          });
-        }
-      }
+      final events = _extractPlatformEvents(queuedRes, const {'pending', 'queued'});
       events.sort((a, b) {
         final aTime = a['scheduledAt'] as String?;
         final bTime = b['scheduledAt'] as String?;
@@ -111,6 +102,16 @@ class _DashboardHomeState extends State<_DashboardHome> {
         return aTime.compareTo(bTime);
       });
 
+      final recent = _extractPlatformEvents(uploadedRes, const {'uploaded'});
+      recent.sort((a, b) {
+        final aTime = (a['publishedAt'] ?? a['scheduledAt']) as String?;
+        final bTime = (b['publishedAt'] ?? b['scheduledAt']) as String?;
+        if (aTime == null && bTime == null) return 0;
+        if (aTime == null) return 1;
+        if (bTime == null) return -1;
+        return bTime.compareTo(aTime); // newest first
+      });
+
       setState(() {
         data = dash;
         notifications = (notifRes['notifications'] as List?) ?? [];
@@ -118,12 +119,36 @@ class _DashboardHomeState extends State<_DashboardHome> {
         youtubeChannel = ytRes['success'] == true ? ytRes['channel'] : null;
         facebookStatus = metaRes['facebook'];
         upcomingEvents = events.take(5).toList();
+        recentVideos = recent.take(4).toList();
       });
     } catch (e) {
       if (mounted) showApiError(context, e);
     } finally {
       if (showLoader && mounted) setState(() => loading = false);
     }
+  }
+
+  List<Map<String, dynamic>> _extractPlatformEvents(Map<String, dynamic> res, Set<String> statuses) {
+    final out = <Map<String, dynamic>>[];
+    final videos = (res['videos'] as List?) ?? [];
+    for (final v in videos) {
+      final platforms = (v['platforms'] as List?) ?? [];
+      for (final p in platforms) {
+        if (!statuses.contains(p['status'])) continue;
+        out.add({
+          'videoId': v['_id'],
+          'platform': p['platform'],
+          'title': p['platform'] == 'youtube'
+              ? (p['title'] ?? 'Untitled')
+              : ((p['caption'] ?? '').toString().isNotEmpty ? p['caption'] : 'Untitled'),
+          'scheduledAt': p['scheduledAt'],
+          'publishedAt': p['publishedAt'],
+          'thumbnailUrl': p['thumbnailUrl'] ?? '',
+          'status': p['status'],
+        });
+      }
+    }
+    return out;
   }
 
   void _goToProfile() {
@@ -139,65 +164,27 @@ class _DashboardHomeState extends State<_DashboardHome> {
     return (email is String && email.isNotEmpty) ? email : null;
   }
 
+  // Real first-letter fallback for the profile avatar — used whenever
+  // there's no connected YouTube channel photo to show instead.
   String get _userInitial {
     final email = _userEmail;
     return (email != null) ? email.trim()[0].toUpperCase() : '?';
+  }
+
+  // Real first name for the "Hello, {name}" greeting — falls back to the
+  // email's local-part, then to a generic greeting if neither is set.
+  String get _userFirstName {
+    final name = data?['name'] ?? data?['user']?['name'] ?? data?['account']?['name'];
+    if (name is String && name.trim().isNotEmpty) return name.trim().split(' ').first;
+    final email = _userEmail;
+    if (email != null && email.contains('@')) return email.split('@').first;
+    return context.tr('there_fallback');
   }
 
   int get _diamondCostPerUpload {
     final cost = data?['diamondCostPerUpload'] ?? data?['uploadCostDiamonds'];
     if (cost is num && cost > 0) return cost.toInt();
     return 10;
-  }
-
-  // Mirrors getUserDailyPostLimit() in routes/video.js: an active,
-  // non-expired subscription unlocks Premium's 2-posts/day cap; everyone
-  // else is on Free's 1-post/day cap.
-  bool get _isPremiumActive {
-    final sub = data?['subscriptionStatus'];
-    if (sub is! Map) return false;
-    final isActive = sub['isActive'] == true;
-    final expiresAtRaw = sub['expiresAt'];
-    if (!isActive) return false;
-    if (expiresAtRaw == null) return true;
-    final expiresAt = DateTime.tryParse(expiresAtRaw.toString());
-    return expiresAt == null || expiresAt.isAfter(DateTime.now());
-  }
-
-  int get _dailyPostLimit => _isPremiumActive ? 2 : 1;
-
-  Widget _planLimitBanner(BuildContext context) {
-    final premium = _isPremiumActive;
-    return Container(
-      margin: const EdgeInsets.only(bottom: 20),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
-      decoration: BoxDecoration(
-        color: (premium ? AppColors.green : AppColors.purple).withOpacity(0.10),
-        border: Border.all(color: (premium ? AppColors.green : AppColors.purple).withOpacity(0.35)),
-        borderRadius: BorderRadius.circular(14),
-      ),
-      child: Row(
-        children: [
-          Icon(premium ? Icons.workspace_premium_rounded : Icons.info_outline_rounded,
-              color: premium ? AppColors.green : AppColors.purple, size: 20),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              premium
-                  ? 'Daily Limit: $_dailyPostLimit Posts / Day (Premium Active)'
-                  : 'Daily Limit: $_dailyPostLimit Post / Day (Free Plan)',
-              style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12.5),
-            ),
-          ),
-          if (!premium)
-            TextButton(
-              onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const DiamondStoreScreen())).then((_) => _load(showLoader: false)),
-              style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6)),
-              child: const Text('Upgrade', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12.5)),
-            ),
-        ],
-      ),
-    );
   }
 
   ({String label, Color color}) _platformMeta(BuildContext context, String? platform) {
@@ -218,7 +205,21 @@ class _DashboardHomeState extends State<_DashboardHome> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(context.tr('app_title')),
+        titleSpacing: 20,
+        title: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 26,
+              height: 26,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(border: Border.all(color: AppColors.purple, width: 2), borderRadius: BorderRadius.circular(8)),
+              child: const Icon(Icons.play_arrow_rounded, color: AppColors.purple, size: 15),
+            ),
+            const SizedBox(width: 8),
+            Text(context.tr('app_title'), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 18)),
+          ],
+        ),
         actions: [
           Stack(
             clipBehavior: Clip.none,
@@ -246,11 +247,11 @@ class _DashboardHomeState extends State<_DashboardHome> {
                     shape: BoxShape.circle,
                     border: Border.all(color: Theme.of(context).colorScheme.surface, width: 1.5),
                   ),
-                  // ⚠️ FIX: previously always showed the account's initial
-                  // letter here. Now shows the REAL connected YouTube
-                  // channel's logo when one is connected — falls back to
-                  // the initial letter only if no channel is connected yet
-                  // (or its thumbnail fails to load).
+                  // Shows the REAL connected YouTube channel photo when
+                  // one is connected — falls back to the real account
+                  // email's first letter (never a fake placeholder image)
+                  // if no channel is connected yet or the photo fails to
+                  // load.
                   child: (youtubeChannel != null && (youtubeChannel!['thumbnail'] ?? '').toString().isNotEmpty)
                       ? ClipOval(
                           child: Image.network(
@@ -277,170 +278,96 @@ class _DashboardHomeState extends State<_DashboardHome> {
           : RefreshIndicator(
               onRefresh: () => _load(showLoader: false),
               child: ListView(
-                padding: const EdgeInsets.fromLTRB(20, 20, 20, 100),
+                padding: const EdgeInsets.fromLTRB(20, 12, 20, 100),
                 children: [
-                  // ---------------- Diamond Balance card ----------------
-                  Container(
-                    padding: const EdgeInsets.all(20),
-                    decoration: BoxDecoration(
-                      gradient: AppColors.gradient,
-                      borderRadius: BorderRadius.circular(22),
-                      boxShadow: [
-                        BoxShadow(color: AppColors.purple.withOpacity(0.30), blurRadius: 22, offset: const Offset(0, 10)),
-                      ],
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                  // ---------------- Greeting ----------------
+                  RichText(
+                    text: TextSpan(
+                      style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: Colors.black),
                       children: [
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Container(
-                              width: 46,
-                              height: 46,
-                              alignment: Alignment.center,
-                              decoration: BoxDecoration(
-                                color: Colors.white.withOpacity(0.18),
-                                shape: BoxShape.circle,
-                                border: Border.all(color: Colors.white.withOpacity(0.35), width: 1.2),
-                              ),
-                              child: const Text('💎', style: TextStyle(fontSize: 22)),
-                            ),
-                            const SizedBox(width: 14),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(context.tr('diamond_balance_home'), style: const TextStyle(color: Colors.white70, fontSize: 12.5, fontWeight: FontWeight.w600)),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    '$diamondBalance',
-                                    style: const TextStyle(color: Colors.white, fontSize: 32, fontWeight: FontWeight.w800, height: 1.05),
-                                  ),
-                                  if (worthUploads > 0) ...[
-                                    const SizedBox(height: 4),
-                                    Text(
-                                      _fmt(context.tr('diamonds_worth_uploads'), worthUploads),
-                                      style: const TextStyle(color: Colors.white70, fontSize: 12),
-                                    ),
-                                  ],
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 18),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: OutlinedButton(
-                                onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const WalletScreen())).then((_) => _load(showLoader: false)),
-                                style: OutlinedButton.styleFrom(
-                                  foregroundColor: Colors.white,
-                                  side: const BorderSide(color: Colors.white, width: 1.2),
-                                  padding: const EdgeInsets.symmetric(vertical: 12),
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
-                                ),
-                                child: Text(context.tr('top_up'), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
-                              ),
-                            ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: ElevatedButton(
-                                onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const DiamondStoreScreen())).then((_) => _load(showLoader: false)),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.white,
-                                  foregroundColor: AppColors.purple,
-                                  elevation: 0,
-                                  padding: const EdgeInsets.symmetric(vertical: 12),
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
-                                ),
-                                child: Text(context.tr('buy_more'), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13)),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 12),
-                        // ---------------- Quick Upload ----------------
-                        SizedBox(
-                          width: double.infinity,
-                          child: OutlinedButton(
-                            onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const UploadScreen())).then((_) => _load(showLoader: false)),
-                            style: OutlinedButton.styleFrom(
-                              side: BorderSide(color: Colors.white.withOpacity(0.55), width: 1.3),
-                              padding: const EdgeInsets.symmetric(vertical: 13),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                            ),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Container(
-                                  width: 22,
-                                  height: 22,
-                                  alignment: Alignment.center,
-                                  decoration: BoxDecoration(color: Colors.white.withOpacity(0.22), shape: BoxShape.circle),
-                                  child: const Icon(Icons.cloud_upload_rounded, color: Colors.white, size: 14),
-                                ),
-                                const SizedBox(width: 10),
-                                Text(context.tr('quick_upload'), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
-                              ],
-                            ),
-                          ),
-                        ),
+                        TextSpan(text: '${context.tr('hello_greeting')} '),
+                        TextSpan(text: '$_userFirstName! 👋', style: const TextStyle(color: AppColors.purple)),
                       ],
                     ),
                   ),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 4),
+                  Text(context.tr('welcome_back_subtitle'), style: TextStyle(color: context.surfaces.textDim, fontSize: 13)),
+                  const SizedBox(height: 20),
 
-                  _planLimitBanner(context),
-
-                  // ---------------- Connected Accounts row ----------------
-                  // ⚠️ Google Drive card removed — Drive auto-upload is no
-                  // longer part of the app. Only YouTube + Facebook now.
-                  Text(context.tr('connected_accounts_home'), style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
-                  const SizedBox(height: 10),
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(
-                        child: _accountCard(
-                          icon: const YoutubeIcon(size: 20),
-                          label: youtubeChannel != null ? (youtubeChannel!['channelTitle'] ?? context.tr('platform_youtube_label')) : context.tr('platform_youtube_label'),
-                          connected: youtubeChannel != null,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: _accountCard(
-                          icon: const FacebookIcon(size: 20),
-                          label: facebookStatus != null ? (facebookStatus!['pageName'] ?? context.tr('platform_facebook_label')) : context.tr('platform_facebook_label'),
-                          connected: facebookStatus != null,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 24),
-
-                  // ---------------- Stats grid ----------------
-                  Text(context.tr('overview'), style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
-                  const SizedBox(height: 10),
+                  // ---------------- Stats grid (real data) ----------------
                   GridView.count(
                     crossAxisCount: 2,
                     shrinkWrap: true,
                     physics: const NeverScrollableScrollPhysics(),
                     mainAxisSpacing: 12,
                     crossAxisSpacing: 12,
-                    childAspectRatio: 1.7,
+                    childAspectRatio: 1.5,
                     children: [
-                      StatCard(label: context.tr('stat_free_uploads_left'), value: '${data?['remainingFreeUploads'] ?? 0}'),
-                      StatCard(label: context.tr('stat_diamond_balance'), value: '$diamondBalance'),
-                      StatCard(label: context.tr('stat_videos_published'), value: '${data?['totalUploadedVideos'] ?? 0}'),
-                      StatCard(label: context.tr('stat_scheduled'), value: '${upcomingEvents.length}'),
+                      _MetricCard(
+                        icon: Icons.cloud_upload_rounded,
+                        label: context.tr('stat_free_uploads_left'),
+                        value: '${data?['remainingFreeUploads'] ?? 0}',
+                        subtitle: context.tr('resets_30_days'),
+                      ),
+                      _MetricCard(
+                        icon: Icons.diamond_rounded,
+                        label: context.tr('stat_diamond_balance'),
+                        value: '$diamondBalance',
+                        subtitle: worthUploads > 0 ? context.tr('diamonds_worth_uploads').replaceAll('%d', '$worthUploads') : null,
+                        onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const WalletScreen())).then((_) => _load(showLoader: false)),
+                      ),
+                      _MetricCard(
+                        icon: Icons.play_circle_fill_rounded,
+                        label: context.tr('stat_videos_published'),
+                        value: '${data?['totalUploadedVideos'] ?? 0}',
+                        subtitle: context.tr('total_videos'),
+                      ),
+                      _MetricCard(
+                        icon: Icons.event_available_rounded,
+                        label: context.tr('scheduled_videos'),
+                        value: '${upcomingEvents.length}',
+                        subtitle: context.tr('this_month'),
+                      ),
                     ],
                   ),
                   const SizedBox(height: 24),
 
-                  // ---------------- Upcoming Schedule timeline ----------------
+                  // ---------------- Quick Actions ----------------
+                  Text(context.tr('quick_actions'), style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      _quickAction(
+                        icon: Icons.cloud_upload_rounded,
+                        label: context.tr('qa_upload_video'),
+                        onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const UploadScreen())).then((_) => _load(showLoader: false)),
+                      ),
+                      _quickAction(
+                        icon: Icons.bar_chart_rounded,
+                        label: context.tr('qa_video_analytics'),
+                        onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const AnalyticsScreen())),
+                      ),
+                      _quickAction(
+                        icon: Icons.auto_awesome_rounded,
+                        label: context.tr('qa_ai_ideas'),
+                        onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const AiIdeasScreen())),
+                      ),
+                      _quickAction(
+                        icon: Icons.notes_rounded,
+                        label: context.tr('qa_description_ideas'),
+                        onTap: () => Navigator.of(context)
+                            .push(MaterialPageRoute(builder: (_) => const AiTitleDescriptionScreen(startInDescriptionMode: true))),
+                      ),
+                      _quickAction(
+                        icon: Icons.fact_check_rounded,
+                        label: context.tr('qa_channel_audit'),
+                        onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const ChannelAuditScreen())),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 24),
+
+                  // ---------------- Upcoming Schedule ----------------
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
@@ -452,13 +379,42 @@ class _DashboardHomeState extends State<_DashboardHome> {
                     ],
                   ),
                   const SizedBox(height: 12),
-                  _buildTimeline(),
+                  if (upcomingEvents.isEmpty)
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(border: Border.all(color: context.surfaces.border), borderRadius: BorderRadius.circular(16)),
+                      child: Text(context.tr('no_upcoming_publishes'), style: TextStyle(color: context.surfaces.textDim, fontSize: 13)),
+                    )
+                  else
+                    ...upcomingEvents.map((e) => _mediaRow(
+                          context,
+                          thumbnailUrl: e['thumbnailUrl'],
+                          title: e['title'] ?? '',
+                          platform: e['platform'],
+                          badgeLabel: e['status'] == 'pending' ? context.tr('status_scheduled') : context.tr('status_queued'),
+                          dateLabel: e['scheduledAt'] != null ? formatDateTime(e['scheduledAt']) : context.tr('publishing_now'),
+                          onTap: () => _openPreview(e),
+                        )),
                   const SizedBox(height: 24),
 
-                  // ---------------- Recent Activity ----------------
+                  // ---------------- Recent Activity (real uploaded videos) ----------------
                   Text(context.tr('recent_activity_home'), style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
                   const SizedBox(height: 10),
-                  _buildRecentActivity(),
+                  if (recentVideos.isEmpty)
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(border: Border.all(color: context.surfaces.border), borderRadius: BorderRadius.circular(16)),
+                      child: Text(context.tr('no_recent_activity'), style: TextStyle(color: context.surfaces.textDim, fontSize: 13)),
+                    )
+                  else
+                    ...recentVideos.map((e) => _mediaRow(
+                          context,
+                          thumbnailUrl: e['thumbnailUrl'],
+                          title: e['title'] ?? '',
+                          platform: e['platform'],
+                          badgeLabel: context.tr('status_published'),
+                          dateLabel: formatDate(e['publishedAt'] ?? e['scheduledAt']),
+                        )),
                   const SizedBox(height: 20),
                 ],
               ),
@@ -466,168 +422,143 @@ class _DashboardHomeState extends State<_DashboardHome> {
     );
   }
 
-  String _fmt(String template, Object value) => template.replaceFirst('%d', '$value').replaceFirst('%s', '$value');
-
-  Widget _accountCard({required Widget icon, required String label, required bool connected}) {
-    return GestureDetector(
-      onTap: _goToProfile,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 14),
-        decoration: BoxDecoration(
-          color: context.surfaces.card2,
-          borderRadius: BorderRadius.circular(16),
-        ),
+  Widget _quickAction({required IconData icon, required String label, required VoidCallback onTap}) {
+    return Expanded(
+      child: GestureDetector(
+        onTap: onTap,
         child: Column(
-          mainAxisSize: MainAxisSize.min,
           children: [
             Container(
-              width: 40, height: 40,
+              width: 52,
+              height: 52,
               alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: (connected ? AppColors.green : context.surfaces.textDim).withOpacity(0.14),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: icon,
+              decoration: BoxDecoration(gradient: AppColors.gradient, borderRadius: BorderRadius.circular(16)),
+              child: Icon(icon, color: Colors.white, size: 22),
             ),
-            const SizedBox(height: 8),
-            Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, textAlign: TextAlign.center, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
-            const SizedBox(height: 4),
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: 6, height: 6,
-                  decoration: BoxDecoration(color: connected ? AppColors.green : context.surfaces.textDim, shape: BoxShape.circle),
-                ),
-                const SizedBox(width: 4),
-                Text(connected ? context.tr('connected_status') : context.tr('connect_status'), style: TextStyle(color: context.surfaces.textDim, fontSize: 10)),
-              ],
-            ),
+            const SizedBox(height: 6),
+            Text(label, textAlign: TextAlign.center, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.w600)),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildTimeline() {
-    if (upcomingEvents.isEmpty) {
-      return Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(border: Border.all(color: context.surfaces.border), borderRadius: BorderRadius.circular(16)),
-        child: Text(context.tr('no_upcoming_publishes'), style: TextStyle(color: context.surfaces.textDim, fontSize: 13)),
-      );
-    }
-
-    return Column(
-      children: List.generate(upcomingEvents.length, (i) {
-        final event = upcomingEvents[i];
-        final meta = _platformMeta(context, event['platform']);
-        final isLast = i == upcomingEvents.length - 1;
-
-        return IntrinsicHeight(
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Column(
+  Widget _mediaRow(
+    BuildContext context, {
+    required String? thumbnailUrl,
+    required String title,
+    required String? platform,
+    required String badgeLabel,
+    required String dateLabel,
+    VoidCallback? onTap,
+  }) {
+    final meta = _platformMeta(context, platform);
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.all(10),
+        decoration: BoxDecoration(border: Border.all(color: context.surfaces.border), borderRadius: BorderRadius.circular(14)),
+        child: Row(
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(10),
+              child: (thumbnailUrl != null && thumbnailUrl.isNotEmpty)
+                  ? Image.network(
+                      thumbnailUrl,
+                      width: 56, height: 56, fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => _thumbnailFallback(meta.color),
+                    )
+                  : _thumbnailFallback(meta.color),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Container(
-                    width: 12, height: 12,
-                    decoration: BoxDecoration(color: meta.color, shape: BoxShape.circle, border: Border.all(color: Theme.of(context).colorScheme.surface, width: 2)),
+                  Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5)),
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      _platformBadgeIcon(platform),
+                      const SizedBox(width: 5),
+                      Text(meta.label, style: TextStyle(color: context.surfaces.textDim, fontSize: 11.5, fontWeight: FontWeight.w600)),
+                    ],
                   ),
-                  if (!isLast)
-                    Expanded(child: Container(width: 2, color: context.surfaces.border)),
+                  const SizedBox(height: 3),
+                  Text(dateLabel, style: TextStyle(color: context.surfaces.textDim, fontSize: 11)),
                 ],
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: GestureDetector(
-                  onTap: () => _openPreview(event),
-                  child: Container(
-                    margin: EdgeInsets.only(bottom: isLast ? 0 : 14),
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(border: Border.all(color: context.surfaces.border), borderRadius: BorderRadius.circular(14)),
-                    child: Row(
-                      children: [
-                        _platformBadgeIcon(event['platform']),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(meta.label, style: TextStyle(color: context.surfaces.textDim, fontSize: 11, fontWeight: FontWeight.w600)),
-                              const SizedBox(height: 4),
-                              Text(event['title'] ?? '', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5)),
-                              const SizedBox(height: 4),
-                              Text(
-                                event['scheduledAt'] != null ? formatDateTime(event['scheduledAt']) : context.tr('publishing_now'),
-                                style: TextStyle(color: context.surfaces.textDim, fontSize: 11.5),
-                              ),
-                            ],
-                          ),
-                        ),
-                        AppBadge(label: event['status'] == 'pending' ? context.tr('status_scheduled') : context.tr('status_queued'), color: meta.color),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        );
-      }),
+            ),
+            const SizedBox(width: 8),
+            AppBadge(label: badgeLabel, color: meta.color),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _thumbnailFallback(Color color) {
+    return Container(
+      width: 56, height: 56,
+      alignment: Alignment.center,
+      color: color.withOpacity(0.14),
+      child: Icon(Icons.movie_outlined, color: color, size: 22),
     );
   }
 
   Widget _platformBadgeIcon(String? platform) {
     switch (platform) {
       case 'youtube':
-        return const YoutubeIcon(size: 16);
+        return const YoutubeIcon(size: 13);
       case 'facebook':
-        return const FacebookIcon(size: 16);
+        return const FacebookIcon(size: 13);
       default:
-        return const Icon(Icons.movie_outlined, size: 16);
+        return const Icon(Icons.movie_outlined, size: 13);
     }
   }
+}
 
-  Widget _buildRecentActivity() {
-    final recent = notifications.take(4).toList();
-    if (recent.isEmpty) {
-      return Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(border: Border.all(color: context.surfaces.border), borderRadius: BorderRadius.circular(16)),
-        child: Text(context.tr('no_recent_activity'), style: TextStyle(color: context.surfaces.textDim, fontSize: 13)),
-      );
-    }
+class _MetricCard extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String value;
+  final String? subtitle;
+  final VoidCallback? onTap;
+  const _MetricCard({required this.icon, required this.label, required this.value, this.subtitle, this.onTap});
 
-    return Container(
-      decoration: BoxDecoration(border: Border.all(color: context.surfaces.border), borderRadius: BorderRadius.circular(16)),
-      child: Column(
-        children: List.generate(recent.length, (i) {
-          final n = recent[i];
-          final isRead = n['isRead'] == true;
-          return Column(
-            children: [
-              ListTile(
-                leading: Container(
-                  width: 34, height: 34,
-                  decoration: BoxDecoration(
-                    color: (isRead ? context.surfaces.textDim : AppColors.purple).withOpacity(0.14),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Icon(
-                    n['type']?.toString().contains('failed') == true ? Icons.error_outline_rounded : Icons.check_circle_outline_rounded,
-                    color: isRead ? context.surfaces.textDim : AppColors.purple,
-                    size: 17,
-                  ),
-                ),
-                title: Text(n['title'] ?? '', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600), maxLines: 1, overflow: TextOverflow.ellipsis),
-                subtitle: Text(n['message'] ?? '', style: TextStyle(color: context.surfaces.textDim, fontSize: 11.5), maxLines: 2, overflow: TextOverflow.ellipsis),
-                dense: true,
-              ),
-              if (i != recent.length - 1) Divider(height: 1, color: context.surfaces.border),
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: context.surfaces.card2,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [BoxShadow(color: AppColors.purple.withOpacity(0.06), blurRadius: 10, offset: const Offset(0, 4))],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 34,
+              height: 34,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(color: AppColors.purple.withOpacity(0.14), borderRadius: BorderRadius.circular(10)),
+              child: Icon(icon, color: AppColors.purple, size: 17),
+            ),
+            const SizedBox(height: 8),
+            Text(label, style: TextStyle(color: context.surfaces.textDim, fontSize: 11.5), maxLines: 1, overflow: TextOverflow.ellipsis),
+            const SizedBox(height: 2),
+            Text(value, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
+            if (subtitle != null) ...[
+              const SizedBox(height: 1),
+              Text(subtitle!, style: TextStyle(color: context.surfaces.textDim, fontSize: 10.5), maxLines: 1, overflow: TextOverflow.ellipsis),
             ],
-          );
-        }),
+          ],
+        ),
       ),
     );
   }

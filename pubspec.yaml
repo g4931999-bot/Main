@@ -26,73 +26,30 @@ dependencies:
   url_launcher: ^6.3.0
   app_links: ^7.2.1
 
-  # Chrome Custom Tabs / SFSafariViewController for OAuth flows (YouTube,
-  # Google Drive, and Facebook/Instagram connect). Faster than a full
-  # external-app switch and shares the device's existing Chrome/Google login
-  # session, so the account picker shows immediately instead of asking for a
-  # manually typed email.
+  # Chrome Custom Tabs / SFSafariViewController
   flutter_custom_tabs: ^2.2.0
 
-  # Push notifications (real phone notifications via Firebase Cloud Messaging)
+  # Push notifications
   firebase_core: ^4.13.0
   firebase_messaging: ^16.5.0
-
-  # Push notifications via OneSignal — used ONLY for the "your free uploads +
-  # diamonds are exhausted, please buy more" alert (see backend
-  # utils/oneSignalPush.js). Every other notification still goes through
-  # Firebase above.
   onesignal_flutter: ^5.2.4
 
-  # Cashfree Payment Gateway — in-app Drop-in checkout SDK, used for
-  # diamond purchases (lib/screens/diamond_store_screen.dart). Fully
-  # replaces the old manual UPI/QR + screenshot + UTR flow.
-  #
-  # ⚠️ CORRECTED PACKAGE NAME: `cashfree_pg` (previously listed here) is a
-  # DIFFERENT, older/unrelated Cashfree package with a completely different
-  # API (token-based webview flow). The package matching the
-  # CFPaymentGatewayService / CFSessionBuilder / CFDropCheckoutPaymentBuilder
-  # API used in diamond_store_screen.dart is `flutter_cashfree_pg_sdk` —
-  # Cashfree's own currently-recommended Flutter SDK. Check pub.dev for a
-  # newer version before a release build if this one has aged.
+  # Payment Gateway
   flutter_cashfree_pg_sdk: ^2.4.0+52
 
-  # Media (photos/videos) permission prompt — requested proactively on the
-  # splash screen (screens/splash_screen.dart), same pattern as the push
-  # notification permission (PushService.initAfterLogin()). image_picker
-  # alone only triggers the system permission dialog reactively when the
-  # user taps "choose file" on the Upload screen — this makes it appear
-  # upfront instead, matching what notifications already did.
+  # Media permissions
   permission_handler: ^11.3.1
 
-  # File pickers (thumbnail, video, and screenshot) - image_picker handles both
-  # images and video, so we don't need the separate file_picker package
-  # (which has a known Android build issue: "cannot find symbol FilePickerPlugin").
+  # File pickers & Preview
   image_picker: ^1.1.2
-
-  # Video preview
   video_player: ^2.9.1
 
-  # Nice date/time formatting & pickers
+  # Utilities
   intl: ^0.20.3
-
-  # Charts for analytics
   fl_chart: ^1.2.0
-
-  # Pull to refresh
   cached_network_image: ^3.3.1
-
-  # Video/image content-type detection for uploads (fixes "wrong file type"
-  # rejections — the http package does NOT auto-detect mime types otherwise)
   mime: ^2.0.0
-
-  # Sharing the referral code via the native share sheet
   share_plus: ^12.0.2
-
-  # App version + build number display — used on the new Settings screen
-  # (settings_screen.dart) to show "TubePilot v1.0.0 (1)" at the bottom.
-  # NOTE: must be ^10.2.1+ — versions 4.0.1–8.0.2 pin win32 <6.0.0, which
-  # conflicts with share_plus 13.x (needs win32 ^6.0.1). 10.2.1+ uses win32
-  # 6.x too, so both packages resolve together.
   package_info_plus: ^8.0.0
 
 dev_dependencies:
@@ -100,8 +57,7 @@ dev_dependencies:
     sdk: flutter
   flutter_lints: ^5.0.0
 
-  # Generates the app's home-screen launcher icon (Android + iOS) from
-  # assets/icon.png at build time. Dev-only — not bundled into the app.
+  # Icon generator only
   flutter_launcher_icons: ^0.14.1
 
 flutter:
@@ -112,15 +68,11 @@ flutter:
     - assets/icon.png
     - assets/splash.png
 
-# Config for flutter_launcher_icons — reads assets/icon.png and generates all
-# required Android (mipmap) and iOS (AppIcon.appiconset) sizes automatically.
+# Launcher icon config
 flutter_launcher_icons:
   android: true
   ios: true
   image_path: "assets/icon.png"
-  # Android 13+ adaptive icon — same source image used for the foreground,
-  # with a solid background color behind it. Change background color if you
-  # want it to match your brand instead of white.
   adaptive_icon_background: "#FFFFFF"
   adaptive_icon_foreground: "assets/icon.png"
   remove_alpha_ios: true

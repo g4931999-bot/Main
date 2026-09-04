@@ -22,7 +22,6 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
   static const _minSplashDuration = Duration(seconds: 7);
 
   late final AnimationController _logoController; // scale/fade-in for the logo
-  late final AnimationController _ringController; // continuous orbit spinner
   late final Animation<double> _logoScale;
   late final Animation<double> _logoFade;
 
@@ -35,15 +34,11 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
     _logoFade = CurvedAnimation(parent: _logoController, curve: Curves.easeIn);
     _logoController.forward();
 
-    _ringController = AnimationController(vsync: this, duration: const Duration(seconds: 2))..repeat();
-
-    // ⚠️ ADD: Photos/Videos permission prompt — previously the app only
+    // ⚠️ Photos/Videos permission prompt — previously the app only
     // ever triggered this reactively, the first time a user tapped
-    // "choose file" on the Upload screen. That's why it never showed up
-    // here on the splash screen the way the notification permission does
-    // (PushService.initAfterLogin(), called below in _decideNextScreen()).
-    // Requesting it here, during the same 7s splash window, gives both
-    // system permission dialogs the same upfront treatment.
+    // "choose file" on the Upload screen. Requesting it here, during the
+    // same 7s splash window, gives both system permission dialogs the
+    // same upfront treatment. (Logic unchanged — UI only update.)
     _requestMediaPermissions();
 
     _decideNextScreen();
@@ -65,7 +60,6 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
   @override
   void dispose() {
     _logoController.dispose();
-    _ringController.dispose();
     super.dispose();
   }
 
@@ -97,127 +91,94 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: const Color(0xFFFBF9FC),
       body: SafeArea(
         child: Stack(
           children: [
-            // Soft gradient glow behind everything, for a bit of depth
-            // instead of a flat white background.
-            Positioned.fill(
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  gradient: RadialGradient(
-                    center: Alignment.topCenter,
-                    radius: 1.2,
-                    colors: [AppColors.purple.withOpacity(0.06), Colors.white],
-                  ),
-                ),
-              ),
-            ),
+            // Decorative purple play-icon shapes scattered around the
+            // frame, matching the brand splash design.
+            Positioned(top: -18, left: -18, child: _decoTriangle(size: 96, rotation: -0.35)),
+            Positioned(top: 40, left: -30, right: -30, child: _decoFrame(height: 230)),
+            Positioned(bottom: -24, left: -24, child: _decoTriangle(size: 130, rotation: 0.15)),
+
             Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  // Orbit spinner ring around the logo, built from the app's
-                  // own gradient so it reads as branded rather than a
-                  // generic platform spinner.
-                  SizedBox(
-                    width: 168,
-                    height: 168,
-                    child: Stack(
-                      alignment: Alignment.center,
-                      children: [
-                        AnimatedBuilder(
-                          animation: _ringController,
-                          builder: (_, child) => Transform.rotate(
-                            angle: _ringController.value * 6.28319,
-                            child: child,
-                          ),
-                          child: SizedBox(
-                            width: 168,
-                            height: 168,
-                            child: CustomPaint(painter: _OrbitRingPainter()),
-                          ),
-                        ),
-                        ScaleTransition(
-                          scale: _logoScale,
-                          child: FadeTransition(
-                            opacity: _logoFade,
-                            child: Container(
-                              width: 118,
-                              height: 118,
-                              decoration: const BoxDecoration(shape: BoxShape.circle, color: Colors.white, boxShadow: [
-                                BoxShadow(color: Color(0x1A000000), blurRadius: 20, offset: Offset(0, 8)),
-                              ]),
-                              padding: const EdgeInsets.all(18),
-                              child: Image.asset(
-                                'assets/splash.png',
-                                fit: BoxFit.contain,
-                                errorBuilder: (_, __, ___) => ShaderMask(
-                                  shaderCallback: (bounds) => AppColors.gradient.createShader(bounds),
-                                  child: const Icon(Icons.play_circle_fill, size: 78, color: Colors.white),
-                                ),
-                              ),
+                  // Logo lockup: "Tube [icon] Pilot"
+                  ScaleTransition(
+                    scale: _logoScale,
+                    child: FadeTransition(
+                      opacity: _logoFade,
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          ShaderMask(
+                            shaderCallback: (bounds) => AppColors.gradient.createShader(bounds),
+                            child: const Text(
+                              'Tube',
+                              style: TextStyle(fontSize: 34, fontWeight: FontWeight.w800, color: Colors.white),
                             ),
                           ),
-                        ),
-                      ],
+                          Container(
+                            margin: const EdgeInsets.symmetric(horizontal: 4),
+                            width: 40,
+                            height: 40,
+                            padding: const EdgeInsets.all(7),
+                            decoration: BoxDecoration(
+                              border: Border.all(color: AppColors.purple, width: 3),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: const Icon(Icons.play_arrow_rounded, color: AppColors.purple),
+                          ),
+                          ShaderMask(
+                            shaderCallback: (bounds) => AppColors.gradient.createShader(bounds),
+                            child: const Text(
+                              'Pilot',
+                              style: TextStyle(fontSize: 34, fontWeight: FontWeight.w800, color: Colors.white),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
 
-                  const SizedBox(height: 28),
+                  const SizedBox(height: 90),
+
+                  // Large centered brand mark
+                  ScaleTransition(
+                    scale: _logoScale,
+                    child: FadeTransition(
+                      opacity: _logoFade,
+                      child: Container(
+                        width: 118,
+                        height: 118,
+                        padding: const EdgeInsets.all(26),
+                        decoration: BoxDecoration(
+                          border: Border.all(color: AppColors.purple, width: 4),
+                          borderRadius: BorderRadius.circular(30),
+                        ),
+                        child: Image.asset(
+                          'assets/splash.png',
+                          fit: BoxFit.contain,
+                          color: AppColors.purple,
+                          errorBuilder: (_, __, ___) => const Icon(Icons.play_arrow_rounded, color: AppColors.purple, size: 56),
+                        ),
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(height: 26),
 
                   FadeTransition(
                     opacity: _logoFade,
-                    child: ShaderMask(
-                      shaderCallback: (bounds) => AppColors.gradient.createShader(bounds),
-                      child: const Text(
-                        'Tube Pilot',
-                        style: TextStyle(
-                          fontSize: 30,
-                          fontWeight: FontWeight.w800,
-                          color: Colors.white, // masked by the gradient shader above
-                          letterSpacing: 0.3,
-                        ),
-                      ),
+                    child: Text(
+                      context.tr('splash_tagline'),
+                      style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: AppColors.purple, letterSpacing: 0.2),
                     ),
                   ),
-                  const SizedBox(height: 10),
-
-                  // Small pulsing status row so the wait doesn't feel dead —
-                  // reassures the person something is actually happening
-                  // during the 7s minimum splash window.
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      SizedBox(
-                        width: 14, height: 14,
-                        child: CircularProgressIndicator(strokeWidth: 2, valueColor: AlwaysStoppedAnimation(AppColors.purple.withOpacity(0.7))),
-                      ),
-                      const SizedBox(width: 10),
-                      Text(context.tr('setting_things_up'), style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: Colors.black45)),
-                    ],
-                  ),
                 ],
-              ),
-            ),
-
-            // Bottom Text
-            Positioned(
-              left: 0,
-              right: 0,
-              bottom: 28,
-              child: Center(
-                child: Text(
-                  context.tr('powered_by'),
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.black54,
-                    letterSpacing: 0.2,
-                  ),
-                ),
               ),
             ),
           ],
@@ -225,27 +186,39 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
       ),
     );
   }
-}
 
-/// Draws a partial gradient ring (not a full circle) with rounded caps, so
-/// the rotation animation reads as an orbiting arc rather than a plain
-/// spinning donut — a bit more distinctive than a default spinner.
-class _OrbitRingPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final rect = Rect.fromLTWH(4, 4, size.width - 8, size.height - 8);
-    final paint = Paint()
-      ..shader = AppColors.gradient.createShader(rect)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 3.5
-      ..strokeCap = StrokeCap.round;
-
-    // Two short arcs on opposite sides of the ring for a lighter, more
-    // "orbiting particle" look than a single continuous circle.
-    canvas.drawArc(rect, 0, 1.9, false, paint);
-    canvas.drawArc(rect, 3.14159, 1.9, false, paint);
+  Widget _decoTriangle({required double size, required double rotation}) {
+    return Transform.rotate(
+      angle: rotation,
+      child: Opacity(
+        opacity: 0.16,
+        child: Container(
+          width: size,
+          height: size,
+          decoration: BoxDecoration(
+            border: Border.all(color: AppColors.purple, width: 8),
+            borderRadius: BorderRadius.circular(size * 0.32),
+          ),
+          padding: EdgeInsets.all(size * 0.28),
+          child: const Icon(Icons.play_arrow_rounded, color: AppColors.purple),
+        ),
+      ),
+    );
   }
 
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+  Widget _decoFrame({required double height}) {
+    return Opacity(
+      opacity: 0.14,
+      child: Transform.rotate(
+        angle: -0.06,
+        child: Container(
+          height: height,
+          decoration: BoxDecoration(
+            border: Border.all(color: AppColors.purple, width: 26),
+            borderRadius: BorderRadius.circular(70),
+          ),
+        ),
+      ),
+    );
+  }
 }

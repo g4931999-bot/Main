@@ -10,7 +10,11 @@ import '../widgets/apply_to_video_sheet.dart';
 /// "Generate & Select" flow for both: enter a topic, generate 4-5 options,
 /// copy or select one, then Apply to Video.
 class AiTitleDescriptionScreen extends StatefulWidget {
-  const AiTitleDescriptionScreen({super.key});
+  /// When true, opens straight into Description mode (used by the
+  /// Dashboard's "Description Ideas" quick action) instead of the
+  /// default Title mode.
+  final bool startInDescriptionMode;
+  const AiTitleDescriptionScreen({super.key, this.startInDescriptionMode = false});
   @override
   State<AiTitleDescriptionScreen> createState() => _AiTitleDescriptionScreenState();
 }
@@ -18,7 +22,7 @@ class AiTitleDescriptionScreen extends StatefulWidget {
 enum _Mode { title, description }
 
 class _AiTitleDescriptionScreenState extends State<AiTitleDescriptionScreen> {
-  _Mode _mode = _Mode.title;
+  late _Mode _mode = widget.startInDescriptionMode ? _Mode.description : _Mode.title;
   final _topicCtrl = TextEditingController();
   bool _loading = false;
   List<String> _options = [];

@@ -10,6 +10,7 @@ import '../widgets/common.dart';
 import '../widgets/brand_icons.dart';
 import 'wallet_screen.dart';
 import 'diamond_store_screen.dart';
+import 'gift_code_screen.dart';
 import 'notifications_screen.dart';
 import 'admin_screen.dart';
 import 'refer_earn_screen.dart';
@@ -627,6 +628,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
             child: Column(children: [
               _menuRow(Icons.shopping_bag_rounded, context.tr('buy_diamonds'), AppColors.diamond,
                   () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const DiamondStoreScreen()))),
+              _divider(),
+              _menuRow(Icons.card_giftcard_rounded, 'Gift Code', AppColors.diamond,
+                  () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const GiftCodeScreen()))),
               _divider(),
               _menuRow(Icons.diamond_rounded, context.tr('subscription_wallet'), AppColors.purple,
                   () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const WalletScreen()))),

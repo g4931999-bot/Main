@@ -10,6 +10,7 @@ import '../services/api_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/common.dart';
 import '../providers/language_provider.dart';
+import 'gift_code_screen.dart';
 
 // ⚠️ FIX: previous version imported from `package:cashfree_pg/...` and
 // declared `implements CFCallback` — neither is correct. The package that
@@ -30,6 +31,12 @@ class _DiamondStoreScreenState extends State<DiamondStoreScreen> {
   int balance = 0;
   bool loading = true;
   int? _payingDiamonds;
+  // ⚠️ Read from the backend (GET /packages -> cashfreeEnvironment), NOT
+  // hardcoded — this is what lets Play Store publishing be a pure backend
+  // .env change (CASHFREE_ENV=PRODUCTION + live keys + restart) with zero
+  // Flutter code changes or rebuilds required. Defaults to PRODUCTION as a
+  // safe fallback if the field is ever missing from an older backend.
+  CFEnvironment _cashfreeEnvironment = CFEnvironment.PRODUCTION;
   // ⚠️ FIX ("Buy fails to trigger payment screen"): doPayment() hands off
   // to the native Cashfree checkout Activity/ViewController and does NOT
   // await — control returns to _buy() immediately, and the actual result
@@ -47,28 +54,6 @@ class _DiamondStoreScreenState extends State<DiamondStoreScreen> {
 
   final CFPaymentGatewayService _cfPaymentGatewayService = CFPaymentGatewayService();
 
-  final _giftCodeCtrl = TextEditingController();
-  bool _redeemingGiftCode = false;
-
-  Future<void> _redeemGiftCode() async {
-    final code = _giftCodeCtrl.text.trim();
-    if (code.isEmpty) {
-      showToast(context, 'Enter a gift code first', isError: true);
-      return;
-    }
-    setState(() => _redeemingGiftCode = true);
-    try {
-      final res = await ApiService.instance.redeemGiftCode(code);
-      _giftCodeCtrl.clear();
-      if (mounted) showToast(context, res['message'] ?? 'Gift code redeemed!', isSuccess: true);
-      await _load();
-    } catch (e) {
-      if (mounted) showApiError(context, e);
-    } finally {
-      if (mounted) setState(() => _redeemingGiftCode = false);
-    }
-  }
-
   @override
   void initState() {
     super.initState();
@@ -79,7 +64,6 @@ class _DiamondStoreScreenState extends State<DiamondStoreScreen> {
   @override
   void dispose() {
     _paymentTimeoutTimer?.cancel();
-    _giftCodeCtrl.dispose();
     super.dispose();
   }
 
@@ -90,6 +74,11 @@ class _DiamondStoreScreenState extends State<DiamondStoreScreen> {
       setState(() {
         packages = pkgRes['packages'];
         balance = pkgRes['currentBalance'] ?? 0;
+        // Backend reports 'SANDBOX' or 'PRODUCTION' — anything else/missing
+        // safely falls back to PRODUCTION.
+        _cashfreeEnvironment = (pkgRes['cashfreeEnvironment'] == 'SANDBOX')
+            ? CFEnvironment.SANDBOX
+            : CFEnvironment.PRODUCTION;
       });
     } catch (e) {
       if (mounted) showApiError(context, e);
@@ -111,9 +100,10 @@ class _DiamondStoreScreenState extends State<DiamondStoreScreen> {
       // order response shows a normal error toast instead of crashing.
       try {
         final session = CFSessionBuilder()
-            // Set to PRODUCTION — matches CASHFREE_ENV=PROD + live keys on
-            // the backend. Both sides must always use the same environment.
-            .setEnvironment(CFEnvironment.PRODUCTION)
+            // Read from the backend (see _load() above) — never hardcoded,
+            // so this always matches whichever keys the backend .env is
+            // currently configured with.
+            .setEnvironment(_cashfreeEnvironment)
             .setOrderId(orderId)
             .setPaymentSessionId(paymentSessionId)
             .build();
@@ -241,7 +231,26 @@ class _DiamondStoreScreenState extends State<DiamondStoreScreen> {
         }
       },
       child: Scaffold(
-      appBar: AppBar(title: Text(context.tr('diamond_store_title'))),
+      appBar: AppBar(
+        title: Text(context.tr('diamond_store_title')),
+        // Visible only when the backend is running in Sandbox — a plain,
+        // hard-to-miss signal that no real money is involved right now.
+        bottom: _cashfreeEnvironment == CFEnvironment.SANDBOX
+            ? PreferredSize(
+                preferredSize: const Size.fromHeight(28),
+                child: Container(
+                  width: double.infinity,
+                  color: AppColors.red,
+                  padding: const EdgeInsets.symmetric(vertical: 5),
+                  child: const Text(
+                    '⚠️ TEST MODE — Sandbox, no real payment',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: Colors.white, fontSize: 11.5, fontWeight: FontWeight.w700),
+                  ),
+                ),
+              )
+            : null,
+      ),
       body: loading
           ? const LoadingView()
           : ListView(
@@ -257,81 +266,92 @@ class _DiamondStoreScreenState extends State<DiamondStoreScreen> {
                 ),
                 const SizedBox(height: 20),
                 Text(context.tr('choose_package'), style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
-                const SizedBox(height: 10),
-                ...packages.map((p) {
-                  final diamonds = p['diamonds'] as int;
-                  final isPaying = _payingDiamonds == diamonds;
-                  return Container(
-                    margin: const EdgeInsets.only(bottom: 10),
-                    padding: const EdgeInsets.all(14),
-                    decoration: BoxDecoration(border: Border.all(color: context.surfaces.border), borderRadius: BorderRadius.circular(14)),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Row(children: [
-                          const Text('💎', style: TextStyle(fontSize: 24)),
-                          const SizedBox(width: 10),
-                          Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                            Text(context.tr('diamonds_suffix').replaceAll('%d', '$diamonds'), style: const TextStyle(fontWeight: FontWeight.w700)),
+                const SizedBox(height: 6),
+                Text(
+                  'Diamonds unlock premium AI tools, faster uploads and more inside the app. Pick a pack below to top up instantly.',
+                  style: TextStyle(color: context.surfaces.textDim, fontSize: 12.5, height: 1.4),
+                ),
+                const SizedBox(height: 14),
+                // ⚠️ UPDATE: package cards moved from a full-width vertical
+                // list to a horizontally scrollable row of cards — same
+                // data, same _buy()/_payingDiamonds logic per card, just a
+                // different layout so more packages are scannable without
+                // a long vertical scroll.
+                SizedBox(
+                  height: 188,
+                  child: ListView.separated(
+                    scrollDirection: Axis.horizontal,
+                    itemCount: packages.length,
+                    separatorBuilder: (_, __) => const SizedBox(width: 12),
+                    itemBuilder: (context, index) {
+                      final p = packages[index];
+                      final diamonds = p['diamonds'] as int;
+                      final isPaying = _payingDiamonds == diamonds;
+                      return Container(
+                        width: 148,
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(border: Border.all(color: context.surfaces.border), borderRadius: BorderRadius.circular(14)),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text('💎', style: TextStyle(fontSize: 28)),
+                            const SizedBox(height: 8),
+                            Text(
+                              context.tr('diamonds_suffix').replaceAll('%d', '$diamonds'),
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(fontWeight: FontWeight.w700),
+                            ),
+                            const SizedBox(height: 4),
                             Text('₹${p['priceINR']}', style: TextStyle(color: context.surfaces.textDim, fontSize: 12.5)),
-                          ]),
-                        ]),
-                        ElevatedButton(
-                          onPressed: _payingDiamonds != null ? null : () => _buy(diamonds),
-                          child: isPaying
-                              ? const SizedBox(
-                                  width: 16,
-                                  height: 16,
-                                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                                )
-                              : Text(context.tr('buy_btn')),
+                            const SizedBox(height: 10),
+                            SizedBox(
+                              width: double.infinity,
+                              child: ElevatedButton(
+                                onPressed: _payingDiamonds != null ? null : () => _buy(diamonds),
+                                child: isPaying
+                                    ? const SizedBox(
+                                        width: 16,
+                                        height: 16,
+                                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                                      )
+                                    : Text(context.tr('buy_btn')),
+                              ),
+                            ),
+                          ],
                         ),
-                      ],
-                    ),
-                  );
-                }),
+                      );
+                    },
+                  ),
+                ),
                 const SizedBox(height: 24),
-                _giftCodeSection(),
+                _giftCodeLink(),
               ],
             ),
       ),
     );
   }
 
-  Widget _giftCodeSection() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(border: Border.all(color: context.surfaces.border), borderRadius: BorderRadius.circular(16)),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(children: [
+  // ⚠️ UPDATE: gift-code redeem UI + logic moved out into its own
+  // GiftCodeScreen (see gift_code_screen.dart). This is now just a
+  // lightweight entry point into that screen instead of an inline form.
+  Widget _giftCodeLink() {
+    return InkWell(
+      borderRadius: BorderRadius.circular(16),
+      onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const GiftCodeScreen())),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(border: Border.all(color: context.surfaces.border), borderRadius: BorderRadius.circular(16)),
+        child: Row(
+          children: [
             const Icon(Icons.card_giftcard_rounded, color: AppColors.purple, size: 18),
-            const SizedBox(width: 8),
-            const Text('Have a Gift Code?', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
-          ]),
-          const SizedBox(height: 10),
-          Row(children: [
-            Expanded(
-              child: TextField(
-                controller: _giftCodeCtrl,
-                textCapitalization: TextCapitalization.characters,
-                decoration: const InputDecoration(hintText: 'Enter code'),
-                onSubmitted: (_) => _redeemGiftCode(),
-              ),
-            ),
             const SizedBox(width: 10),
-            SizedBox(
-              height: 52,
-              child: ElevatedButton(
-                onPressed: _redeemingGiftCode ? null : _redeemGiftCode,
-                child: _redeemingGiftCode
-                    ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                    : const Text('Redeem'),
-              ),
+            const Expanded(
+              child: Text('Have a Gift Code? Redeem it here', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
             ),
-          ]),
-        ],
+            Icon(Icons.chevron_right, color: context.surfaces.textDim),
+          ],
+        ),
       ),
     );
   }
