@@ -349,7 +349,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 width: 40, height: 40,
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
-                  color: (connected ? AppColors.green : context.surfaces.textDim).withOpacity(0.14),
+                  color: (connected ? AppColors.green : context.surfaces.textDim).withValues(alpha: 0.14),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: icon,
@@ -384,8 +384,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
             connected
                 ? CircleAvatar(
                     radius: 20,
-                    backgroundColor: (AppColors.green).withOpacity(0.14),
-                    backgroundImage: (instagram!['igProfilePicture'] ?? '').toString().isNotEmpty
+                    backgroundColor: (AppColors.green).withValues(alpha: 0.14),
+                    backgroundImage: (instagram['igProfilePicture'] ?? '').toString().isNotEmpty
                         ? NetworkImage(instagram['igProfilePicture'])
                         : null,
                     child: (instagram['igProfilePicture'] ?? '').toString().isEmpty
@@ -395,7 +395,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 : Container(
                     width: 40, height: 40,
                     alignment: Alignment.center,
-                    decoration: BoxDecoration(color: context.surfaces.textDim.withOpacity(0.14), borderRadius: BorderRadius.circular(12)),
+                    decoration: BoxDecoration(color: context.surfaces.textDim.withValues(alpha: 0.14), borderRadius: BorderRadius.circular(12)),
                     child: const InstagramIcon(size: 20),
                   ),
             const SizedBox(height: 8),
@@ -436,7 +436,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               Container(
                 width: 48, height: 48,
                 alignment: Alignment.center,
-                decoration: BoxDecoration(color: context.surfaces.textDim.withOpacity(0.12), borderRadius: BorderRadius.circular(14)),
+                decoration: BoxDecoration(color: context.surfaces.textDim.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(14)),
                 child: const YoutubeIcon(size: 24),
               ),
               const SizedBox(width: 14),
@@ -466,7 +466,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          gradient: LinearGradient(colors: [AppColors.red.withOpacity(0.10), AppColors.red.withOpacity(0.02)]),
+          gradient: LinearGradient(colors: [AppColors.red.withValues(alpha: 0.10), AppColors.red.withValues(alpha: 0.02)]),
           border: Border.all(color: context.surfaces.border),
           borderRadius: BorderRadius.circular(18),
         ),
@@ -479,14 +479,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       width: 48, height: 48, fit: BoxFit.cover,
                       errorBuilder: (_, __, ___) => Container(
                         width: 48, height: 48,
-                        decoration: BoxDecoration(color: AppColors.red.withOpacity(0.14), shape: BoxShape.circle),
+                        decoration: BoxDecoration(color: AppColors.red.withValues(alpha: 0.14), shape: BoxShape.circle),
                         child: const YoutubeIcon(size: 24),
                       ),
                     ),
                   )
                 : Container(
                     width: 48, height: 48,
-                    decoration: BoxDecoration(color: AppColors.red.withOpacity(0.14), shape: BoxShape.circle),
+                    decoration: BoxDecoration(color: AppColors.red.withValues(alpha: 0.14), shape: BoxShape.circle),
                     child: const YoutubeIcon(size: 24),
                   ),
             const SizedBox(width: 14),
@@ -681,7 +681,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return ListTile(
       leading: Container(
         width: 34, height: 34,
-        decoration: BoxDecoration(color: color.withOpacity(0.14), borderRadius: BorderRadius.circular(10)),
+        decoration: BoxDecoration(color: color.withValues(alpha: 0.14), borderRadius: BorderRadius.circular(10)),
         child: Icon(icon, color: color, size: 17),
       ),
       title: Text(label, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),

@@ -303,6 +303,14 @@ class ApiService {
 
   // ---------------- Analytics: Competitors & Audit ----------------
   Future<Map<String, dynamic>> listCompetitors() => _request('/analytics/competitors');
+
+  /// Live channel-name search for the Competitor Radar "add competitor"
+  /// autocomplete (e.g. typing "tube" returns matching real YouTube
+  /// channels with name + thumbnail + channelId). Backed by
+  /// GET /api/analytics/competitors/search?q=... — see routes/analytics.js.
+  Future<Map<String, dynamic>> searchCompetitors(String query) =>
+      _request('/analytics/competitors/search?q=${Uri.encodeQueryComponent(query)}');
+
   Future<Map<String, dynamic>> addCompetitor({String? channelId, String? handle, String? label}) =>
       _request('/analytics/competitors', method: 'POST', body: {
         if (channelId != null) 'channelId': channelId,

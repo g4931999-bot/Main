@@ -27,7 +27,7 @@ class ReferEarnScreen extends StatelessWidget {
               children: [
                 Container(
                   width: 60, height: 60,
-                  decoration: BoxDecoration(color: Colors.white.withOpacity(0.18), shape: BoxShape.circle),
+                  decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.18), shape: BoxShape.circle),
                   child: const Icon(Icons.card_giftcard_rounded, color: Colors.white, size: 30),
                 ),
                 const SizedBox(height: 12),

@@ -215,7 +215,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 Container(
                   width: 40, height: 40,
                   alignment: Alignment.center,
-                  decoration: BoxDecoration(color: AppColors.purple.withOpacity(0.14), borderRadius: BorderRadius.circular(12)),
+                  decoration: BoxDecoration(color: AppColors.purple.withValues(alpha: 0.14), borderRadius: BorderRadius.circular(12)),
                   child: const Icon(Icons.mail_outline_rounded, color: AppColors.purple, size: 20),
                 ),
                 const SizedBox(width: 12),
@@ -254,7 +254,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ListTile(
                   leading: Container(
                     width: 34, height: 34,
-                    decoration: BoxDecoration(color: AppColors.purpleLight.withOpacity(0.14), borderRadius: BorderRadius.circular(10)),
+                    decoration: BoxDecoration(color: AppColors.purpleLight.withValues(alpha: 0.14), borderRadius: BorderRadius.circular(10)),
                     child: const Icon(Icons.language_rounded, color: AppColors.purpleLight, size: 17),
                   ),
                   title: Text(context.tr('app_language'), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
@@ -273,7 +273,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     title: Text(context.tr('auto_refill_diamonds'), style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
                     subtitle: Text(context.tr('auto_refill_subtitle'), style: TextStyle(color: context.surfaces.textDim, fontSize: 12)),
                     value: _autoRefillDiamonds,
-                    activeColor: _switchActiveColor,
+                    activeThumbColor: _switchActiveColor,
                     inactiveThumbColor: _switchInactiveThumbColor,
                     inactiveTrackColor: _switchInactiveTrackColor,
                     onChanged: _toggleAutoRefill,
@@ -295,7 +295,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             child: ListTile(
               leading: Container(
                 width: 34, height: 34,
-                decoration: BoxDecoration(color: AppColors.green.withOpacity(0.14), borderRadius: BorderRadius.circular(10)),
+                decoration: BoxDecoration(color: AppColors.green.withValues(alpha: 0.14), borderRadius: BorderRadius.circular(10)),
                 child: const Icon(Icons.cleaning_services_outlined, color: AppColors.green, size: 17),
               ),
               title: Text(context.tr('clear_local_cache'), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),

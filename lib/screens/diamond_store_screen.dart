@@ -10,7 +10,6 @@ import '../services/api_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/common.dart';
 import '../providers/language_provider.dart';
-import 'gift_code_screen.dart';
 
 // ⚠️ FIX: previous version imported from `package:cashfree_pg/...` and
 // declared `implements CFCallback` — neither is correct. The package that
@@ -268,7 +267,7 @@ class _DiamondStoreScreenState extends State<DiamondStoreScreen> {
                 Text(context.tr('choose_package'), style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
                 const SizedBox(height: 6),
                 Text(
-                  'Diamonds unlock premium AI tools, faster uploads and more inside the app. Pick a pack below to top up instantly.',
+                  context.tr('diamond_store_description'),
                   style: TextStyle(color: context.surfaces.textDim, fontSize: 12.5, height: 1.4),
                 ),
                 const SizedBox(height: 14),
@@ -325,33 +324,63 @@ class _DiamondStoreScreenState extends State<DiamondStoreScreen> {
                   ),
                 ),
                 const SizedBox(height: 24),
-                _giftCodeLink(),
+                // ⚠️ REMOVED (Boss request): "Have a Gift Code? Redeem it
+                // here" used to link out to GiftCodeScreen from this
+                // screen. Gift code redemption now lives on its own entry
+                // point in Profile & Settings, so this card was removed
+                // entirely to avoid a duplicate path into the same screen.
+                _enterpriseCard(),
               ],
             ),
       ),
     );
   }
 
-  // ⚠️ UPDATE: gift-code redeem UI + logic moved out into its own
-  // GiftCodeScreen (see gift_code_screen.dart). This is now just a
-  // lightweight entry point into that screen instead of an inline form.
-  Widget _giftCodeLink() {
-    return InkWell(
-      borderRadius: BorderRadius.circular(16),
-      onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const GiftCodeScreen())),
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(border: Border.all(color: context.surfaces.border), borderRadius: BorderRadius.circular(16)),
-        child: Row(
-          children: [
-            const Icon(Icons.card_giftcard_rounded, color: AppColors.purple, size: 18),
-            const SizedBox(width: 10),
-            const Expanded(
-              child: Text('Have a Gift Code? Redeem it here', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+  // ⚠️ NEW (Boss request — "enterprises rakho"): static bulk/custom
+  // diamonds card. The numbered packages above (₹10 / ₹50 / ₹100 / ₹200
+  // etc.) come entirely from GET /diamonds/packages on the backend — this
+  // card is intentionally NOT one of those, since a large custom/bulk
+  // order isn't a fixed SKU. It just opens a contact channel instead of a
+  // purchase flow.
+  Widget _enterpriseCard() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        gradient: AppColors.gradient,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 40,
+            height: 40,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.18), borderRadius: BorderRadius.circular(12)),
+            child: const Icon(Icons.workspaces_rounded, color: Colors.white, size: 20),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(context.tr('diamond_enterprise_title'), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 15)),
+                const SizedBox(height: 2),
+                Text(context.tr('diamond_enterprise_subtitle'), style: const TextStyle(color: Colors.white70, fontSize: 12)),
+              ],
             ),
-            Icon(Icons.chevron_right, color: context.surfaces.textDim),
-          ],
-        ),
+          ),
+          const SizedBox(width: 8),
+          TextButton(
+            onPressed: () => showToast(context, context.tr('diamond_enterprise_toast')),
+            style: TextButton.styleFrom(
+              backgroundColor: Colors.white.withValues(alpha: 0.18),
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            ),
+            child: Text(context.tr('diamond_enterprise_cta'), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12.5)),
+          ),
+        ],
       ),
     );
   }

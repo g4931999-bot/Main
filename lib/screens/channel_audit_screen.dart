@@ -95,7 +95,7 @@ class _ChannelAuditScreenState extends State<ChannelAuditScreen> {
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(gradient: AppColors.gradient, borderRadius: BorderRadius.circular(20)),
           child: Column(children: [
-            Text('Channel Health', style: TextStyle(color: Colors.white.withOpacity(0.85), fontSize: 13, fontWeight: FontWeight.w600)),
+            Text('Channel Health', style: TextStyle(color: Colors.white.withValues(alpha: 0.85), fontSize: 13, fontWeight: FontWeight.w600)),
             const SizedBox(height: 8),
             Text('$score/100', style: const TextStyle(color: Colors.white, fontSize: 40, fontWeight: FontWeight.w900)),
             const SizedBox(height: 4),

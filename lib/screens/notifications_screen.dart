@@ -172,7 +172,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                                 Container(
                                   width: 36, height: 36,
                                   alignment: Alignment.center,
-                                  decoration: BoxDecoration(color: iconColor.withOpacity(0.14), borderRadius: BorderRadius.circular(10)),
+                                  decoration: BoxDecoration(color: iconColor.withValues(alpha: 0.14), borderRadius: BorderRadius.circular(10)),
                                   child: Icon(icon, color: iconColor, size: 18),
                                 ),
                                 const SizedBox(width: 12),

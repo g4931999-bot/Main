@@ -36,7 +36,7 @@ InputDecoration circularDropdownDecoration(
     ),
     disabledBorder: OutlineInputBorder(
       borderRadius: BorderRadius.circular(30.0),
-      borderSide: BorderSide(color: AppColors.purple.withOpacity(0.35)),
+      borderSide: BorderSide(color: AppColors.purple.withValues(alpha: 0.35)),
     ),
   );
 }
@@ -89,7 +89,7 @@ class CustomDropdown<T> extends StatelessWidget {
     final itemTextColor = isDark ? Colors.white : Colors.black;
 
     return DropdownButtonFormField<T>(
-      value: value,
+      initialValue: value,
       isExpanded: true,
       icon: const Icon(Icons.keyboard_arrow_down_rounded, color: AppColors.purple),
       borderRadius: BorderRadius.circular(20),

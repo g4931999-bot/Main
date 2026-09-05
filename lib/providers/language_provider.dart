@@ -59,7 +59,7 @@ class LanguageProvider extends ChangeNotifier {
 /// `context.watch<LanguageProvider>().tr('key')` everywhere.
 extension LocalizationExtension on BuildContext {
   String tr(String key) {
-    final provider = this.dependOnInheritedWidgetOfExactType<_LanguageInherited>();
+    final provider = dependOnInheritedWidgetOfExactType<_LanguageInherited>();
     if (provider != null) return provider.languageProvider.tr(key);
     // Fallback: still works even if used outside the InheritedWidget scope,
     // just won't auto-rebuild on language change in that spot.

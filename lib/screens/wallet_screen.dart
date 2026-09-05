@@ -124,7 +124,7 @@ class _WalletScreenState extends State<WalletScreen> with SingleTickerProviderSt
           margin: const EdgeInsets.only(bottom: 10),
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            border: Border.all(color: isRefund ? AppColors.green.withOpacity(0.5) : context.surfaces.border),
+            border: Border.all(color: isRefund ? AppColors.green.withValues(alpha: 0.5) : context.surfaces.border),
             borderRadius: BorderRadius.circular(14),
           ),
           child: Row(
@@ -132,7 +132,7 @@ class _WalletScreenState extends State<WalletScreen> with SingleTickerProviderSt
               Container(
                 width: 38, height: 38,
                 alignment: Alignment.center,
-                decoration: BoxDecoration(color: iconColor.withOpacity(0.14), borderRadius: BorderRadius.circular(11)),
+                decoration: BoxDecoration(color: iconColor.withValues(alpha: 0.14), borderRadius: BorderRadius.circular(11)),
                 child: Icon(icon, size: 18, color: iconColor),
               ),
               const SizedBox(width: 12),

@@ -643,7 +643,7 @@ class _UploadScreenState extends State<UploadScreen> {
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: selected ? AppColors.purple.withOpacity(0.14) : context.surfaces.card2,
+                  color: selected ? AppColors.purple.withValues(alpha: 0.14) : context.surfaces.card2,
                   border: Border.all(color: selected ? AppColors.purple : context.surfaces.border, width: selected ? 2 : 1),
                 ),
                 child: Stack(
@@ -665,7 +665,7 @@ class _UploadScreenState extends State<UploadScreen> {
                         height: 9,
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
-                          color: connected ? AppColors.green : context.surfaces.textDim.withOpacity(0.5),
+                          color: connected ? AppColors.green : context.surfaces.textDim.withValues(alpha: 0.5),
                           border: Border.all(color: Theme.of(context).colorScheme.surface, width: 1.5),
                         ),
                       ),

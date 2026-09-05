@@ -362,7 +362,7 @@ class _FeatureRow extends StatelessWidget {
           width: 34,
           height: 34,
           decoration: BoxDecoration(
-            color: AppColors.green.withOpacity(0.14),
+            color: AppColors.green.withValues(alpha: 0.14),
             borderRadius: BorderRadius.circular(10),
           ),
           child: Icon(feature.icon, color: AppColors.green, size: 17),
@@ -460,7 +460,7 @@ class _PlatformRow extends StatelessWidget {
           height: 34,
           alignment: Alignment.center,
           decoration: BoxDecoration(
-            color: AppColors.purple.withOpacity(0.14),
+            color: AppColors.purple.withValues(alpha: 0.14),
             borderRadius: BorderRadius.circular(10),
           ),
           child: _logoFor(platform.name),

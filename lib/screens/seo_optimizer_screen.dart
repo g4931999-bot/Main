@@ -104,7 +104,7 @@ class _SeoOptimizerScreenState extends State<SeoOptimizerScreen> {
       child: Container(
         margin: const EdgeInsets.symmetric(horizontal: 4),
         padding: const EdgeInsets.symmetric(vertical: 12),
-        decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(14), border: Border.all(color: color.withOpacity(0.4))),
+        decoration: BoxDecoration(color: color.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(14), border: Border.all(color: color.withValues(alpha: 0.4))),
         child: Column(children: [
           Text('$value', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: color)),
           const SizedBox(height: 2),
@@ -184,7 +184,7 @@ class _SeoOptimizerScreenState extends State<SeoOptimizerScreen> {
               Wrap(
                 spacing: 8,
                 runSpacing: 8,
-                children: recommendedTags.map((t) => Chip(label: Text(t), backgroundColor: AppColors.purple.withOpacity(0.12))).toList(),
+                children: recommendedTags.map((t) => Chip(label: Text(t), backgroundColor: AppColors.purple.withValues(alpha: 0.12))).toList(),
               ),
               const SizedBox(height: 14),
               OutlinedButton.icon(

@@ -8,7 +8,7 @@ void showToast(BuildContext context, String message, {bool isError = false, bool
   ScaffoldMessenger.of(context).showSnackBar(
     SnackBar(
       behavior: SnackBarBehavior.floating,
-      backgroundColor: isError || isSuccess ? color.withOpacity(0.15) : null,
+      backgroundColor: isError || isSuccess ? color.withValues(alpha: 0.15) : null,
       content: Text(
         message,
         style: TextStyle(color: isError ? AppColors.red : (isSuccess ? AppColors.green : null)),
@@ -25,14 +25,21 @@ void showApiError(BuildContext context, Object err) {
 // User-friendly fallback for AI generation failures specifically (Groq
 // model errors, timeouts, rate limits) — the raw error can be a technical
 // message like "Groq API error (404): ..." which isn't meaningful to a
-// creator tapping "Generate". Shows a plain retry-oriented message instead,
-// while insufficient-diamonds errors still surface their real (useful) text.
+// creator tapping "Generate". Shows a plain retry-oriented message instead.
+//
+// ⚠️ (Boss request): when the failure is specifically a diamond-balance
+// issue, show the exact upgrade prompt instead of the raw backend text or
+// the generic "temporarily unavailable" message — every paid AI button
+// (title/description/tags/caption/hashtags) routes through this function,
+// so this one change covers all of them consistently.
 void showAiError(BuildContext context, Object err) {
   final raw = err.toString().replaceFirst('ApiException: ', '');
   final isCreditIssue = raw.toLowerCase().contains('diamond') || raw.toLowerCase().contains('insufficient');
   showToast(
     context,
-    isCreditIssue ? raw : 'AI generation is temporarily unavailable — please try again in a moment.',
+    isCreditIssue
+        ? 'Diamond is not available, please upgrade'
+        : 'AI generation is temporarily unavailable — please try again in a moment.',
     isError: true,
   );
 }
@@ -54,7 +61,7 @@ class GradientButton extends StatelessWidget {
         decoration: BoxDecoration(
           gradient: AppColors.gradient,
           borderRadius: BorderRadius.circular(14),
-          boxShadow: [BoxShadow(color: AppColors.purple.withOpacity(0.35), blurRadius: 18, offset: const Offset(0, 8))],
+          boxShadow: [BoxShadow(color: AppColors.purple.withValues(alpha: 0.35), blurRadius: 18, offset: const Offset(0, 8))],
         ),
         child: Material(
           color: Colors.transparent,
@@ -95,7 +102,7 @@ class AppBadge extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
-      decoration: BoxDecoration(color: color.withOpacity(0.15), borderRadius: BorderRadius.circular(999)),
+      decoration: BoxDecoration(color: color.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(999)),
       child: Text(label, style: TextStyle(color: color, fontSize: 11, fontWeight: FontWeight.w700)),
     );
   }
@@ -129,7 +136,7 @@ class BalanceBanner extends StatelessWidget {
           ElevatedButton(
             onPressed: onBuy,
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.white.withOpacity(0.22),
+              backgroundColor: Colors.white.withValues(alpha: 0.22),
               foregroundColor: Colors.white,
               elevation: 0,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
@@ -208,7 +215,7 @@ class AppBottomNav extends StatelessWidget {
             border: Border.all(color: context.surfaces.border),
             boxShadow: [
               BoxShadow(
-                color: isDark ? Colors.black.withOpacity(0.6) : AppColors.purple.withOpacity(0.14),
+                color: isDark ? Colors.black.withValues(alpha: 0.6) : AppColors.purple.withValues(alpha: 0.14),
                 blurRadius: 22,
                 offset: const Offset(0, 10),
               ),
@@ -230,7 +237,7 @@ class AppBottomNav extends StatelessWidget {
                       margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
                       alignment: Alignment.center,
                       decoration: BoxDecoration(
-                        color: selected ? AppColors.purple.withOpacity(isDark ? 0.25 : 0.12) : Colors.transparent,
+                        color: selected ? AppColors.purple.withValues(alpha: isDark ? 0.25 : 0.12) : Colors.transparent,
                         borderRadius: BorderRadius.circular(20),
                       ),
                       child: Icon(

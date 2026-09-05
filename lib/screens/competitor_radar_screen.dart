@@ -1,19 +1,9 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/common.dart';
 
-/// Screen 3/7 — GET/POST/DELETE /api/analytics/competitors.
-///
-/// NOTE on the "Alert Banner ... highlights trending videos gaining >2x
-/// views": the backend's VPH (Views Per Hour) is the closest real signal
-/// available — it's an AVERAGE across each competitor's recent uploads, not
-/// a per-video delta against that video's own historical baseline, so a
-/// true "2x their normal rate" comparison isn't something the API returns
-/// yet. This screen instead flags any tracked competitor whose current VPH
-/// is more than 2x the group's average VPH — an honest, computable
-/// approximation of "this one is currently trending relative to the
-/// others you're tracking" — rather than a number the backend can't back up.
 class CompetitorRadarScreen extends StatefulWidget {
   const CompetitorRadarScreen({super.key});
   @override
@@ -22,20 +12,37 @@ class CompetitorRadarScreen extends StatefulWidget {
 
 class _CompetitorRadarScreenState extends State<CompetitorRadarScreen> {
   final _inputCtrl = TextEditingController();
+  final _focusNode = FocusNode();
   bool _loading = true;
   bool _adding = false;
   List<Map<String, dynamic>> _competitors = [];
   String? _apiKeyError;
 
+  // ---------------- Typeahead state ----------------
+  Timer? _debounce;
+  bool _searching = false;
+  List<Map<String, dynamic>> _suggestions = [];
+  bool _showSuggestions = false;
+
   @override
   void initState() {
     super.initState();
     _load();
+    _focusNode.addListener(() {
+      if (!_focusNode.hasFocus) {
+        // small delay so a tap on a suggestion registers before we hide the list
+        Future.delayed(const Duration(milliseconds: 150), () {
+          if (mounted) setState(() => _showSuggestions = false);
+        });
+      }
+    });
   }
 
   @override
   void dispose() {
+    _debounce?.cancel();
     _inputCtrl.dispose();
+    _focusNode.dispose();
     super.dispose();
   }
 
@@ -57,15 +64,60 @@ class _CompetitorRadarScreenState extends State<CompetitorRadarScreen> {
     }
   }
 
-  Future<void> _addCompetitor() async {
+  // ---------------- Typeahead search (debounced) ----------------
+  void _onSearchChanged(String value) {
+    _debounce?.cancel();
+    final query = value.trim();
+    if (query.length < 2) {
+      setState(() {
+        _suggestions = [];
+        _showSuggestions = false;
+      });
+      return;
+    }
+    _debounce = Timer(const Duration(milliseconds: 400), () => _runSearch(query));
+  }
+
+  Future<void> _runSearch(String query) async {
+    setState(() => _searching = true);
+    try {
+      final res = await ApiService.instance.searchCompetitors(query);
+      final results = (res['results'] as List? ?? []).cast<Map<String, dynamic>>();
+      if (!mounted) return;
+      setState(() {
+        _suggestions = results;
+        _showSuggestions = true;
+      });
+    } catch (e) {
+      if (mounted) setState(() => _showSuggestions = false);
+    } finally {
+      if (mounted) setState(() => _searching = false);
+    }
+  }
+
+  Future<void> _addFromSuggestion(Map<String, dynamic> suggestion) async {
+    setState(() {
+      _showSuggestions = false;
+      _suggestions = [];
+      _inputCtrl.clear();
+    });
+    _focusNode.unfocus();
+    await _addCompetitor(
+      channelId: suggestion['channelId'] as String?,
+      label: suggestion['title'] as String?,
+    );
+  }
+
+  Future<void> _addCompetitor({String? channelId, String? handle, String? label}) async {
     final input = _inputCtrl.text.trim();
-    if (input.isEmpty) return;
+    if (channelId == null && handle == null && input.isEmpty) return;
     setState(() => _adding = true);
     try {
-      final isHandle = input.startsWith('@');
+      final isHandle = handle != null || input.startsWith('@');
       await ApiService.instance.addCompetitor(
-        channelId: isHandle ? null : input,
-        handle: isHandle ? input : null,
+        channelId: channelId ?? (isHandle ? null : (input.isNotEmpty ? input : null)),
+        handle: handle ?? (isHandle ? (input.isNotEmpty ? input : null) : null),
+        label: label,
       );
       _inputCtrl.clear();
       await _load();
@@ -109,11 +161,22 @@ class _CompetitorRadarScreenState extends State<CompetitorRadarScreen> {
         child: ListView(
           padding: const EdgeInsets.all(20),
           children: [
+            // ---------------- Search + Add (with typeahead suggestions) ----------------
             Row(children: [
               Expanded(
                 child: TextFormField(
                   controller: _inputCtrl,
-                  decoration: const InputDecoration(hintText: '@handle or channel ID'),
+                  focusNode: _focusNode,
+                  decoration: InputDecoration(
+                    hintText: 'Search channel name, @handle or ID',
+                    suffixIcon: _searching
+                        ? const Padding(
+                            padding: EdgeInsets.all(14),
+                            child: SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)),
+                          )
+                        : null,
+                  ),
+                  onChanged: _onSearchChanged,
                   onFieldSubmitted: (_) => _addCompetitor(),
                 ),
               ),
@@ -121,19 +184,56 @@ class _CompetitorRadarScreenState extends State<CompetitorRadarScreen> {
               SizedBox(
                 height: 52,
                 child: ElevatedButton(
-                  onPressed: _adding ? null : _addCompetitor,
+                  onPressed: _adding ? null : () => _addCompetitor(),
                   child: _adding
                       ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
                       : const Icon(Icons.add_rounded),
                 ),
               ),
             ]),
+
+            // ---------------- Suggestions dropdown ----------------
+            if (_showSuggestions && _suggestions.isNotEmpty)
+              Container(
+                margin: const EdgeInsets.only(top: 6),
+                decoration: BoxDecoration(
+                  border: Border.all(color: context.surfaces.border),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: ListView.separated(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: _suggestions.length,
+                  separatorBuilder: (_, __) => Divider(height: 1, color: context.surfaces.border),
+                  itemBuilder: (_, i) {
+                    final s = _suggestions[i];
+                    final thumb = (s['thumbnail'] ?? '').toString();
+                    return ListTile(
+                      leading: CircleAvatar(
+                        radius: 18,
+                        backgroundColor: AppColors.purple.withValues(alpha: 0.14),
+                        backgroundImage: thumb.isNotEmpty ? NetworkImage(thumb) : null,
+                        child: thumb.isEmpty ? const Icon(Icons.person_rounded, color: AppColors.purple, size: 18) : null,
+                      ),
+                      title: Text(s['title'] ?? '', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5)),
+                      subtitle: Text(s['description'] ?? '', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: context.surfaces.textDim, fontSize: 11.5)),
+                      onTap: () => _addFromSuggestion(s),
+                    );
+                  },
+                ),
+              )
+            else if (_showSuggestions && !_searching && _suggestions.isEmpty)
+              Padding(
+                padding: const EdgeInsets.only(top: 10),
+                child: Text('No channels found', style: TextStyle(color: context.surfaces.textDim, fontSize: 12.5)),
+              ),
+
             const SizedBox(height: 20),
             if (_apiKeyError != null)
               Container(
                 margin: const EdgeInsets.only(bottom: 16),
                 padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(color: AppColors.red.withOpacity(0.08), border: Border.all(color: AppColors.red.withOpacity(0.3)), borderRadius: BorderRadius.circular(12)),
+                decoration: BoxDecoration(color: AppColors.red.withValues(alpha: 0.08), border: Border.all(color: AppColors.red.withValues(alpha: 0.3)), borderRadius: BorderRadius.circular(12)),
                 child: Row(children: [
                   const Icon(Icons.warning_amber_rounded, color: AppColors.red, size: 18),
                   const SizedBox(width: 8),
@@ -154,7 +254,7 @@ class _CompetitorRadarScreenState extends State<CompetitorRadarScreen> {
                   margin: const EdgeInsets.only(bottom: 12),
                   padding: const EdgeInsets.all(14),
                   decoration: BoxDecoration(
-                    border: Border.all(color: isTrending ? AppColors.green.withOpacity(0.5) : context.surfaces.border),
+                    border: Border.all(color: isTrending ? AppColors.green.withValues(alpha: 0.5) : context.surfaces.border),
                     borderRadius: BorderRadius.circular(16),
                   ),
                   child: Column(
@@ -163,7 +263,7 @@ class _CompetitorRadarScreenState extends State<CompetitorRadarScreen> {
                       Row(children: [
                         CircleAvatar(
                           radius: 22,
-                          backgroundColor: AppColors.purple.withOpacity(0.14),
+                          backgroundColor: AppColors.purple.withValues(alpha: 0.14),
                           backgroundImage: thumbnail.isNotEmpty ? NetworkImage(thumbnail) : null,
                           child: thumbnail.isEmpty ? const Icon(Icons.person_rounded, color: AppColors.purple) : null,
                         ),

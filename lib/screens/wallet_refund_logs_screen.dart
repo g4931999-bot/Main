@@ -66,7 +66,7 @@ class _WalletRefundLogsScreenState extends State<WalletRefundLogsScreen> {
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                          Text('Diamond Balance', style: TextStyle(color: Colors.white.withOpacity(0.85), fontSize: 12.5, fontWeight: FontWeight.w600)),
+                          Text('Diamond Balance', style: TextStyle(color: Colors.white.withValues(alpha: 0.85), fontSize: 12.5, fontWeight: FontWeight.w600)),
                           const SizedBox(height: 6),
                           Row(children: [
                             const Text('💎', style: TextStyle(fontSize: 22)),
@@ -93,7 +93,7 @@ class _WalletRefundLogsScreenState extends State<WalletRefundLogsScreen> {
                       return Container(
                         margin: const EdgeInsets.only(bottom: 10),
                         padding: const EdgeInsets.all(14),
-                        decoration: BoxDecoration(border: Border.all(color: AppColors.green.withOpacity(0.5)), borderRadius: BorderRadius.circular(14)),
+                        decoration: BoxDecoration(border: Border.all(color: AppColors.green.withValues(alpha: 0.5)), borderRadius: BorderRadius.circular(14)),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [

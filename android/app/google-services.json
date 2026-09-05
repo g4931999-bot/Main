@@ -14,11 +14,11 @@
       },
       "oauth_client": [
         {
-          "client_id": "348714273929-bfm6hjdiqrmg5frgeseg103351onbvao.apps.googleusercontent.com",
+          "client_id": "348714273929-th77i7d5j12u4s6vp2idbase8vd8e8ji.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {
             "package_name": "com.tubepilot.app",
-            "certificate_hash": "59b8c9ce9bc2f04b35549a7ad2e7c1f1db672671"
+            "certificate_hash": "6fb2abaf724953412ee27c51a3458ef3a7985767"
           }
         },
         {

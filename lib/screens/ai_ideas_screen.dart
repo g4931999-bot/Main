@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../services/api_service.dart';
 import '../theme/app_theme.dart';
+import '../providers/language_provider.dart';
 import '../widgets/common.dart';
 import '../widgets/custom_dropdown.dart';
 
@@ -13,6 +14,16 @@ import '../widgets/custom_dropdown.dart';
 /// Scheduler" copies the idea's title + script to the clipboard so the
 /// creator can paste it in while uploading — a real, working action
 /// instead of a dead button.
+///
+/// ⚠️ FIX (Boss request — "dropdown sahi se nahin ho raha, ise sahi
+/// karo"): Niche/Platform were a `DropdownButtonFormField` (CustomDropdown)
+/// whose opened menu is a separate Overlay that Flutter positions relative
+/// to the field itself — on some devices/list lengths that overlay can
+/// render oddly (clipped/overlapping nearby text). Swapped both to the
+/// app's own bottom-sheet picker pattern (PickerField + a modal list,
+/// same family as pickers used elsewhere in the app) — a fixed, full-width
+/// sheet has none of that overlay-positioning risk and matches the rest
+/// of the app's picker UX.
 class AiIdeasScreen extends StatefulWidget {
   const AiIdeasScreen({super.key});
   @override
@@ -20,10 +31,13 @@ class AiIdeasScreen extends StatefulWidget {
 }
 
 class _AiIdeasScreenState extends State<AiIdeasScreen> {
-  static const _niches = ['Tech', 'Gaming', 'Lifestyle', 'Business', 'Fitness', 'Food', 'Travel', 'Comedy'];
-  static const _platforms = {'youtube': 'YouTube', 'instagram': 'Instagram', 'facebook': 'Facebook'};
+  static const _nicheKeys = [
+    'niche_tech', 'niche_gaming', 'niche_lifestyle', 'niche_business',
+    'niche_fitness', 'niche_food', 'niche_travel', 'niche_comedy',
+  ];
+  static const _platforms = {'youtube': 'platform_youtube_label', 'instagram': 'platform_instagram_label', 'facebook': 'platform_facebook_label'};
 
-  String _niche = _niches.first;
+  String _nicheKey = _nicheKeys.first;
   String _platform = 'youtube';
   bool _loading = false;
   String? _error;
@@ -36,14 +50,15 @@ class _AiIdeasScreenState extends State<AiIdeasScreen> {
       _error = null;
     });
     try {
-      final res = await ApiService.instance.aiIdeas(niche: _niche, platform: _platform, count: 5);
+      final niche = context.tr(_nicheKey);
+      final res = await ApiService.instance.aiIdeas(niche: niche, platform: _platform, count: 5);
       final ideas = (res['ideas'] as List? ?? []).cast<Map<String, dynamic>>();
       setState(() {
         _ideas = ideas;
         _expanded.clear();
       });
       if (ideas.isEmpty && mounted) {
-        showToast(context, 'No ideas came back — try a different niche', isError: true);
+        showToast(context, context.tr('ai_ideas_no_ideas_error'), isError: true);
       }
     } catch (e) {
       if (mounted) showAiError(context, e);
@@ -59,37 +74,101 @@ class _AiIdeasScreenState extends State<AiIdeasScreen> {
     return AppColors.red;
   }
 
+  Future<void> _pickNiche() async {
+    final picked = await _showPickerSheet(
+      title: context.tr('select_niche_title'),
+      options: _nicheKeys,
+      labelBuilder: (k) => context.tr(k),
+      selected: _nicheKey,
+    );
+    if (picked != null) setState(() => _nicheKey = picked);
+  }
+
+  Future<void> _pickPlatform() async {
+    final picked = await _showPickerSheet(
+      title: context.tr('select_platform_title'),
+      options: _platforms.keys.toList(),
+      labelBuilder: (k) => context.tr(_platforms[k]!),
+      selected: _platform,
+    );
+    if (picked != null) setState(() => _platform = picked);
+  }
+
+  Future<String?> _showPickerSheet({
+    required String title,
+    required List<String> options,
+    required String Function(String) labelBuilder,
+    required String selected,
+  }) {
+    return showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (sheetContext) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 10),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(width: 40, height: 4, margin: const EdgeInsets.only(bottom: 12), decoration: BoxDecoration(color: sheetContext.surfaces.border, borderRadius: BorderRadius.circular(999))),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(title, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
+                ),
+              ),
+              const SizedBox(height: 6),
+              Flexible(
+                child: ListView.builder(
+                  shrinkWrap: true,
+                  itemCount: options.length,
+                  itemBuilder: (_, i) {
+                    final option = options[i];
+                    final isSelected = option == selected;
+                    return ListTile(
+                      title: Text(labelBuilder(option), style: TextStyle(fontWeight: isSelected ? FontWeight.w800 : FontWeight.w500)),
+                      trailing: isSelected ? const Icon(Icons.check_rounded, color: AppColors.purple) : null,
+                      onTap: () => Navigator.of(sheetContext).pop(option),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('AI Ideas')),
+      appBar: AppBar(title: Text(context.tr('ai_ideas_title'))),
       body: ListView(
         padding: const EdgeInsets.all(20),
         children: [
-          Text('Niche', style: TextStyle(color: context.surfaces.textDim, fontSize: 12.5, fontWeight: FontWeight.w700)),
+          Text(context.tr('ai_ideas_niche_label'), style: TextStyle(color: context.surfaces.textDim, fontSize: 12.5, fontWeight: FontWeight.w700)),
           const SizedBox(height: 8),
-          CustomDropdown<String>(
-            value: _niche,
-            items: _niches,
-            labelBuilder: (v) => v,
-            onChanged: (v) => setState(() => _niche = v ?? _niche),
+          PickerField(
+            value: context.tr(_nicheKey),
+            onTap: _pickNiche,
             prefixIcon: const Icon(Icons.category_rounded, size: 18, color: AppColors.purple),
           ),
           const SizedBox(height: 16),
-          Text('Platform', style: TextStyle(color: context.surfaces.textDim, fontSize: 12.5, fontWeight: FontWeight.w700)),
+          Text(context.tr('ai_ideas_platform_label'), style: TextStyle(color: context.surfaces.textDim, fontSize: 12.5, fontWeight: FontWeight.w700)),
           const SizedBox(height: 8),
-          CustomDropdown<String>(
-            value: _platform,
-            items: _platforms.keys.toList(),
-            labelBuilder: (v) => _platforms[v] ?? v,
-            onChanged: (v) => setState(() => _platform = v ?? _platform),
+          PickerField(
+            value: context.tr(_platforms[_platform]!),
+            onTap: _pickPlatform,
             prefixIcon: const Icon(Icons.hub_rounded, size: 18, color: AppColors.purple),
           ),
           const SizedBox(height: 22),
-          GradientButton(label: 'Generate Fresh Ideas', icon: Icons.auto_awesome_rounded, loading: _loading, onPressed: _generate),
+          GradientButton(label: context.tr('ai_ideas_generate_btn'), icon: Icons.auto_awesome_rounded, loading: _loading, onPressed: _generate),
           const SizedBox(height: 24),
           if (!_loading && _ideas.isEmpty && _error == null)
-            const EmptyView(message: 'Pick a niche and platform, then generate 5 fresh video ideas.', icon: Icons.lightbulb_outline_rounded),
+            EmptyView(message: context.tr('ai_ideas_empty_state'), icon: Icons.lightbulb_outline_rounded),
           ..._ideas.asMap().entries.map((entry) {
             final i = entry.key;
             final idea = entry.value;
@@ -107,13 +186,13 @@ class _AiIdeasScreenState extends State<AiIdeasScreen> {
                       child: Text(idea['title'] ?? '', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15.5)),
                     ),
                     const SizedBox(width: 8),
-                    AppBadge(label: _platforms[_platform] ?? _platform, color: AppColors.purple),
+                    AppBadge(label: context.tr(_platforms[_platform]!), color: AppColors.purple),
                   ]),
                   const SizedBox(height: 10),
                   Row(children: [
                     Icon(Icons.local_fire_department_rounded, size: 16, color: _scoreColor(score)),
                     const SizedBox(width: 5),
-                    Text('Viral Score', style: TextStyle(color: context.surfaces.textDim, fontSize: 12)),
+                    Text(context.tr('ai_ideas_viral_score'), style: TextStyle(color: context.surfaces.textDim, fontSize: 12)),
                     const Spacer(),
                     Text('$score/100', style: TextStyle(color: _scoreColor(score), fontWeight: FontWeight.w800, fontSize: 13)),
                   ]),
@@ -145,17 +224,17 @@ class _AiIdeasScreenState extends State<AiIdeasScreen> {
                     TextButton.icon(
                       onPressed: () => setState(() => expanded ? _expanded.remove(i) : _expanded.add(i)),
                       icon: Icon(expanded ? Icons.expand_less_rounded : Icons.expand_more_rounded, size: 18),
-                      label: Text(expanded ? 'Hide Script' : 'Full Script'),
+                      label: Text(expanded ? context.tr('ai_ideas_hide_script') : context.tr('ai_ideas_full_script')),
                     ),
                     const Spacer(),
                     ElevatedButton.icon(
                       onPressed: () {
                         final text = '${idea['title']}\n\n${idea['script'] ?? idea['description']}';
                         Clipboard.setData(ClipboardData(text: text));
-                        showToast(context, 'Copied — paste it into your upload', isSuccess: true);
+                        showToast(context, context.tr('ai_ideas_copied_toast'), isSuccess: true);
                       },
                       icon: const Icon(Icons.send_rounded, size: 16),
-                      label: const Text('Send to Scheduler'),
+                      label: Text(context.tr('ai_ideas_send_to_scheduler')),
                     ),
                   ]),
                 ],

@@ -10,7 +10,6 @@ import 'analytics_screen.dart';
 import 'profile_screen.dart';
 import 'wallet_screen.dart';
 import 'notifications_screen.dart';
-import 'preview_screen.dart';
 import 'rate_us_screen.dart';
 import 'ai_ideas_screen.dart';
 import 'ai_title_description_screen.dart';
@@ -247,26 +246,17 @@ class _DashboardHomeState extends State<_DashboardHome> {
                     shape: BoxShape.circle,
                     border: Border.all(color: Theme.of(context).colorScheme.surface, width: 1.5),
                   ),
-                  // Shows the REAL connected YouTube channel photo when
-                  // one is connected — falls back to the real account
-                  // email's first letter (never a fake placeholder image)
-                  // if no channel is connected yet or the photo fails to
-                  // load.
-                  child: (youtubeChannel != null && (youtubeChannel!['thumbnail'] ?? '').toString().isNotEmpty)
-                      ? ClipOval(
-                          child: Image.network(
-                            youtubeChannel!['thumbnail'],
-                            width: 34, height: 34, fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) => Text(
-                              _userInitial,
-                              style: const TextStyle(color: Colors.white, fontSize: 14.5, fontWeight: FontWeight.w800),
-                            ),
-                          ),
-                        )
-                      : Text(
-                          _userInitial,
-                          style: const TextStyle(color: Colors.white, fontSize: 14.5, fontWeight: FontWeight.w800),
-                        ),
+                  // ⚠️ FIX (Boss request): always show the signed-up
+                  // account's email first letter here — NEVER the
+                  // connected YouTube channel's logo/photo. The YouTube
+                  // channel photo previously took priority; that's
+                  // reversed now so this avatar always reflects the
+                  // TubePilot account itself, regardless of which
+                  // channel is connected.
+                  child: Text(
+                    _userInitial,
+                    style: const TextStyle(color: Colors.white, fontSize: 14.5, fontWeight: FontWeight.w800),
+                  ),
                 ),
               ),
             ),
@@ -295,13 +285,20 @@ class _DashboardHomeState extends State<_DashboardHome> {
                   const SizedBox(height: 20),
 
                   // ---------------- Stats grid (real data) ----------------
+                  // ⚠️ FIX ("BOTTOM OVERFLOWED BY 31 PIXELS"): 1.5 made each
+                  // cell shorter than the content actually needed (icon +
+                  // label + value + subtitle), so it overflowed at the
+                  // bottom on every phone size. Lowered aspect ratio gives
+                  // each cell more height; _MetricCard below also got
+                  // tighter padding/spacing so there's comfortable margin
+                  // either way.
                   GridView.count(
                     crossAxisCount: 2,
                     shrinkWrap: true,
                     physics: const NeverScrollableScrollPhysics(),
                     mainAxisSpacing: 12,
                     crossAxisSpacing: 12,
-                    childAspectRatio: 1.5,
+                    childAspectRatio: 1.25,
                     children: [
                       _MetricCard(
                         icon: Icons.cloud_upload_rounded,
@@ -335,7 +332,18 @@ class _DashboardHomeState extends State<_DashboardHome> {
                   // ---------------- Quick Actions ----------------
                   Text(context.tr('quick_actions'), style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
                   const SizedBox(height: 12),
+                  // ⚠️ FIX (Boss request — "AI Ideas icon niche ho gaya"):
+                  // Row's default crossAxisAlignment is `center`, which
+                  // vertically centers each _quickAction based on its own
+                  // total height. Since labels wrap to a different number
+                  // of lines per action ("Upload Video" wraps to 2 lines,
+                  // "AI Ideas" fits on 1), the shorter items were getting
+                  // centered against the tallest item — visually dropping
+                  // their icon lower than the rest. Pinning to `start`
+                  // keeps every icon on the same top edge regardless of
+                  // how many lines its label wraps to.
                   Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       _quickAction(
                         icon: Icons.cloud_upload_rounded,
@@ -502,7 +510,7 @@ class _DashboardHomeState extends State<_DashboardHome> {
     return Container(
       width: 56, height: 56,
       alignment: Alignment.center,
-      color: color.withOpacity(0.14),
+      color: color.withValues(alpha: 0.14),
       child: Icon(Icons.movie_outlined, color: color, size: 22),
     );
   }
@@ -532,30 +540,34 @@ class _MetricCard extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.all(14),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         decoration: BoxDecoration(
           color: context.surfaces.card2,
           borderRadius: BorderRadius.circular(16),
-          boxShadow: [BoxShadow(color: AppColors.purple.withOpacity(0.06), blurRadius: 10, offset: const Offset(0, 4))],
+          boxShadow: [BoxShadow(color: AppColors.purple.withValues(alpha: 0.06), blurRadius: 10, offset: const Offset(0, 4))],
         ),
+        // ⚠️ FIX: mainAxisSize.min + tighter internal spacing (see below)
+        // keeps this Column's total height comfortably under the grid
+        // cell's height instead of overflowing it.
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
           children: [
             Container(
-              width: 34,
-              height: 34,
+              width: 30,
+              height: 30,
               alignment: Alignment.center,
-              decoration: BoxDecoration(color: AppColors.purple.withOpacity(0.14), borderRadius: BorderRadius.circular(10)),
-              child: Icon(icon, color: AppColors.purple, size: 17),
+              decoration: BoxDecoration(color: AppColors.purple.withValues(alpha: 0.14), borderRadius: BorderRadius.circular(9)),
+              child: Icon(icon, color: AppColors.purple, size: 15),
             ),
-            const SizedBox(height: 8),
-            Text(label, style: TextStyle(color: context.surfaces.textDim, fontSize: 11.5), maxLines: 1, overflow: TextOverflow.ellipsis),
+            const SizedBox(height: 6),
+            Text(label, style: TextStyle(color: context.surfaces.textDim, fontSize: 11), maxLines: 1, overflow: TextOverflow.ellipsis),
             const SizedBox(height: 2),
-            Text(value, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
+            Text(value, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
             if (subtitle != null) ...[
               const SizedBox(height: 1),
-              Text(subtitle!, style: TextStyle(color: context.surfaces.textDim, fontSize: 10.5), maxLines: 1, overflow: TextOverflow.ellipsis),
+              Text(subtitle!, style: TextStyle(color: context.surfaces.textDim, fontSize: 10), maxLines: 1, overflow: TextOverflow.ellipsis),
             ],
           ],
         ),

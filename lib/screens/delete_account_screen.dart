@@ -81,9 +81,9 @@ class _DeleteAccountScreenState extends State<DeleteAccountScreen> {
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: AppColors.red.withOpacity(0.08),
+              color: AppColors.red.withValues(alpha: 0.08),
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: AppColors.red.withOpacity(0.25)),
+              border: Border.all(color: AppColors.red.withValues(alpha: 0.25)),
             ),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,

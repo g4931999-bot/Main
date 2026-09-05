@@ -126,7 +126,7 @@ class _AiTitleDescriptionScreenState extends State<AiTitleDescriptionScreen> {
               decoration: BoxDecoration(
                 border: Border.all(color: selected ? AppColors.purple : context.surfaces.border, width: selected ? 1.6 : 1),
                 borderRadius: BorderRadius.circular(14),
-                color: selected ? AppColors.purple.withOpacity(0.06) : null,
+                color: selected ? AppColors.purple.withValues(alpha: 0.06) : null,
               ),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,

@@ -283,7 +283,7 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
             Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                gradient: LinearGradient(colors: [AppColors.purple, AppColors.purple.withOpacity(0.6)]),
+                gradient: LinearGradient(colors: [AppColors.purple, AppColors.purple.withValues(alpha: 0.6)]),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: const Icon(Icons.shield_outlined, size: 18, color: Colors.white),
@@ -307,7 +307,7 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
               indicatorSize: TabBarIndicatorSize.tab,
               indicator: BoxDecoration(
                 borderRadius: BorderRadius.circular(12),
-                gradient: LinearGradient(colors: [AppColors.purple, AppColors.purple.withOpacity(0.75)]),
+                gradient: LinearGradient(colors: [AppColors.purple, AppColors.purple.withValues(alpha: 0.75)]),
               ),
               dividerColor: Colors.transparent,
               labelColor: Colors.white,
@@ -379,7 +379,7 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
             children: [
               Container(
                 padding: const EdgeInsets.all(7),
-                decoration: BoxDecoration(color: color.withOpacity(0.14), borderRadius: BorderRadius.circular(10)),
+                decoration: BoxDecoration(color: color.withValues(alpha: 0.14), borderRadius: BorderRadius.circular(10)),
                 child: Icon(icon, size: 16, color: color),
               ),
               const SizedBox(height: 10),
@@ -470,7 +470,7 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
     // Cashfree transactions show their Order ID; any older transaction
     // from before the Cashfree migration falls back to its UTR number.
     final referenceLabel = (cashfreeOrderId != null && cashfreeOrderId.toString().isNotEmpty)
-        ? 'Order ${cashfreeOrderId}'
+        ? 'Order $cashfreeOrderId'
         : 'UTR ${t['utrNumber'] ?? '-'}';
 
     return Container(
@@ -492,7 +492,7 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
                   children: [
                     CircleAvatar(
                       radius: 18,
-                      backgroundColor: AppColors.purple.withOpacity(0.15),
+                      backgroundColor: AppColors.purple.withValues(alpha: 0.15),
                       child: Text(
                         (t['userDisplayId'] ?? '?').toString().substring(0, 1),
                         style: const TextStyle(color: AppColors.purple, fontWeight: FontWeight.w800, fontSize: 13),
@@ -550,7 +550,7 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
               alignment: Alignment.centerLeft,
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                decoration: BoxDecoration(color: AppColors.diamond.withOpacity(0.14), borderRadius: BorderRadius.circular(20)),
+                decoration: BoxDecoration(color: AppColors.diamond.withValues(alpha: 0.14), borderRadius: BorderRadius.circular(20)),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -572,7 +572,7 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
                 alignment: Alignment.centerLeft,
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                  decoration: BoxDecoration(color: badgeColor.withOpacity(0.14), borderRadius: BorderRadius.circular(20)),
+                  decoration: BoxDecoration(color: badgeColor.withValues(alpha: 0.14), borderRadius: BorderRadius.circular(20)),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
@@ -653,7 +653,7 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
                                           children: [
                                             CircleAvatar(
                                               radius: 20,
-                                              backgroundColor: (isActive ? AppColors.green : AppColors.red).withOpacity(0.15),
+                                              backgroundColor: (isActive ? AppColors.green : AppColors.red).withValues(alpha: 0.15),
                                               child: Text(
                                                 displayName.substring(0, 1).toUpperCase(),
                                                 style: TextStyle(color: isActive ? AppColors.green : AppColors.red, fontWeight: FontWeight.w800),
@@ -684,7 +684,7 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
                                       Container(
                                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                                         decoration: BoxDecoration(
-                                          color: (isActive ? AppColors.green : AppColors.red).withOpacity(0.14),
+                                          color: (isActive ? AppColors.green : AppColors.red).withValues(alpha: 0.14),
                                           borderRadius: BorderRadius.circular(20),
                                         ),
                                         child: Text(

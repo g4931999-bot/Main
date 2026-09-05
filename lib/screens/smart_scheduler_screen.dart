@@ -73,11 +73,11 @@ class _SmartSchedulerScreenState extends State<SmartSchedulerScreen> {
       case 3:
         return AppColors.purpleLight;
       case 2:
-        return AppColors.purpleLight.withOpacity(0.6);
+        return AppColors.purpleLight.withValues(alpha: 0.6);
       case 1:
-        return AppColors.purpleLight.withOpacity(0.32);
+        return AppColors.purpleLight.withValues(alpha: 0.32);
       default:
-        return AppColors.purpleLight.withOpacity(0.14);
+        return AppColors.purpleLight.withValues(alpha: 0.14);
     }
   }
 

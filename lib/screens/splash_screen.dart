@@ -88,24 +88,53 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
     );
   }
 
+  // ⚠️ FIX (Boss request): the real logo lives at assets/logo.png (add it
+  // to pubspec.yaml's flutter/assets list if it isn't already there — a
+  // single transparent-background PNG, ideally square, is what this
+  // widget expects). Used for BOTH the small lockup mark and the large
+  // centered brand mark below, so there's only one source of truth for
+  // "what the TubePilot logo looks like" instead of a separate mocked
+  // icon in each spot.
+  Widget _realLogo({required double size}) {
+    return Image.asset(
+      'assets/splash.png',
+      width: size,
+      height: size,
+      fit: BoxFit.contain,
+      // Fallback only fires if assets/logo.png is missing from the
+      // project/pubspec — keeps the splash from crashing while the real
+      // asset is wired in.
+      errorBuilder: (_, __, ___) => Icon(Icons.play_arrow_rounded, color: AppColors.purple, size: size * 0.6),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    // ⚠️ FIX (Boss request — "background hamara transparent hai to koi
+    // bhi background nahin hona chahiye"): removed the solid off-white
+    // Scaffold color AND every decorative shape (_decoTriangle /
+    // _decoFrame boxes) that used to be scattered around the frame. The
+    // splash now shows nothing but the real logo, tagline, and footer on
+    // a fully transparent Scaffold.
+    //
+    // Note: Scaffold.backgroundColor: Colors.transparent only controls
+    // the Flutter-drawn background — if you also want the native Android
+    // launch (before Flutter's first frame) to be transparent, that's a
+    // separate change in android/app/src/main/res/values/styles.xml
+    // (the launch theme's windowBackground), which isn't a file in this
+    // batch — let me know if you want that too and send styles.xml.
     return Scaffold(
-      backgroundColor: const Color(0xFFFBF9FC),
+      backgroundColor: Colors.transparent,
       body: SafeArea(
         child: Stack(
           children: [
-            // Decorative purple play-icon shapes scattered around the
-            // frame, matching the brand splash design.
-            Positioned(top: -18, left: -18, child: _decoTriangle(size: 96, rotation: -0.35)),
-            Positioned(top: 40, left: -30, right: -30, child: _decoFrame(height: 230)),
-            Positioned(bottom: -24, left: -24, child: _decoTriangle(size: 130, rotation: 0.15)),
-
             Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  // Logo lockup: "Tube [icon] Pilot"
+                  // Logo lockup: "Tube [real logo] Pilot" — same wordmark
+                  // as before, but the mock bordered play-icon box in the
+                  // middle is now the real logo image.
                   ScaleTransition(
                     scale: _logoScale,
                     child: FadeTransition(
@@ -121,16 +150,9 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
                               style: TextStyle(fontSize: 34, fontWeight: FontWeight.w800, color: Colors.white),
                             ),
                           ),
-                          Container(
-                            margin: const EdgeInsets.symmetric(horizontal: 4),
-                            width: 40,
-                            height: 40,
-                            padding: const EdgeInsets.all(7),
-                            decoration: BoxDecoration(
-                              border: Border.all(color: AppColors.purple, width: 3),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: const Icon(Icons.play_arrow_rounded, color: AppColors.purple),
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 4),
+                            child: _realLogo(size: 40),
                           ),
                           ShaderMask(
                             shaderCallback: (bounds) => AppColors.gradient.createShader(bounds),
@@ -144,28 +166,15 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
                     ),
                   ),
 
-                  const SizedBox(height: 90),
+                  const SizedBox(height: 60),
 
-                  // Large centered brand mark
+                  // Large centered brand mark — real logo only, no
+                  // border/box container around it anymore.
                   ScaleTransition(
                     scale: _logoScale,
                     child: FadeTransition(
                       opacity: _logoFade,
-                      child: Container(
-                        width: 118,
-                        height: 118,
-                        padding: const EdgeInsets.all(26),
-                        decoration: BoxDecoration(
-                          border: Border.all(color: AppColors.purple, width: 4),
-                          borderRadius: BorderRadius.circular(30),
-                        ),
-                        child: Image.asset(
-                          'assets/splash.png',
-                          fit: BoxFit.contain,
-                          color: AppColors.purple,
-                          errorBuilder: (_, __, ___) => const Icon(Icons.play_arrow_rounded, color: AppColors.purple, size: 56),
-                        ),
-                      ),
+                      child: _realLogo(size: 140),
                     ),
                   ),
 
@@ -181,42 +190,24 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
                 ],
               ),
             ),
+
+            // ⚠️ NEW (Boss request): "Powered by TubePilot" centered at
+            // the very bottom of the splash screen.
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 18,
+              child: FadeTransition(
+                opacity: _logoFade,
+                child: Center(
+                  child: Text(
+                    context.tr('splash_powered_by'),
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.purple.withValues(alpha: 0.65)),
+                  ),
+                ),
+              ),
+            ),
           ],
-        ),
-      ),
-    );
-  }
-
-  Widget _decoTriangle({required double size, required double rotation}) {
-    return Transform.rotate(
-      angle: rotation,
-      child: Opacity(
-        opacity: 0.16,
-        child: Container(
-          width: size,
-          height: size,
-          decoration: BoxDecoration(
-            border: Border.all(color: AppColors.purple, width: 8),
-            borderRadius: BorderRadius.circular(size * 0.32),
-          ),
-          padding: EdgeInsets.all(size * 0.28),
-          child: const Icon(Icons.play_arrow_rounded, color: AppColors.purple),
-        ),
-      ),
-    );
-  }
-
-  Widget _decoFrame({required double height}) {
-    return Opacity(
-      opacity: 0.14,
-      child: Transform.rotate(
-        angle: -0.06,
-        child: Container(
-          height: height,
-          decoration: BoxDecoration(
-            border: Border.all(color: AppColors.purple, width: 26),
-            borderRadius: BorderRadius.circular(70),
-          ),
         ),
       ),
     );

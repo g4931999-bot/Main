@@ -423,7 +423,7 @@ class _PolicySection extends StatelessWidget {
               width: 26,
               height: 26,
               alignment: Alignment.center,
-              decoration: BoxDecoration(color: AppColors.purple.withOpacity(0.14), borderRadius: BorderRadius.circular(8)),
+              decoration: BoxDecoration(color: AppColors.purple.withValues(alpha: 0.14), borderRadius: BorderRadius.circular(8)),
               child: Text(number, style: const TextStyle(color: AppColors.purple, fontWeight: FontWeight.w800, fontSize: 12.5)),
             ),
             const SizedBox(width: 10),

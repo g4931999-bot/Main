@@ -316,7 +316,7 @@ class _UpcomingScreenState extends State<UpcomingScreen> with SingleTickerProvid
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
         decoration: BoxDecoration(
-          color: selected ? AppColors.purple.withOpacity(0.14) : context.surfaces.card2,
+          color: selected ? AppColors.purple.withValues(alpha: 0.14) : context.surfaces.card2,
           border: Border.all(color: selected ? AppColors.purple : context.surfaces.border),
           borderRadius: BorderRadius.circular(999),
         ),

@@ -126,13 +126,16 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
               child: ListView(
                 padding: const EdgeInsets.fromLTRB(20, 8, 20, 110),
                 children: [
+                  // ⚠️ FIX ("BOTTOM OVERFLOWED BY 31 PIXELS"): same fix as
+                  // dashboard_screen.dart's stats grid — 1.5 didn't leave
+                  // enough cell height for icon + label + value + subtitle.
                   GridView.count(
                     crossAxisCount: 2,
                     shrinkWrap: true,
                     physics: const NeverScrollableScrollPhysics(),
                     mainAxisSpacing: 12,
                     crossAxisSpacing: 12,
-                    childAspectRatio: 1.5,
+                    childAspectRatio: 1.25,
                     children: [
                       _MetricCard(
                         icon: Icons.cloud_upload_rounded,
@@ -193,7 +196,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
 
                   Container(
                     padding: const EdgeInsets.all(14),
-                    decoration: BoxDecoration(color: AppColors.red.withOpacity(0.06), border: Border.all(color: AppColors.red.withOpacity(0.25)), borderRadius: BorderRadius.circular(16)),
+                    decoration: BoxDecoration(color: AppColors.red.withValues(alpha: 0.06), border: Border.all(color: AppColors.red.withValues(alpha: 0.25)), borderRadius: BorderRadius.circular(16)),
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -201,7 +204,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                           width: 40,
                           height: 40,
                           alignment: Alignment.center,
-                          decoration: BoxDecoration(color: AppColors.red.withOpacity(0.14), borderRadius: BorderRadius.circular(12)),
+                          decoration: BoxDecoration(color: AppColors.red.withValues(alpha: 0.14), borderRadius: BorderRadius.circular(12)),
                           child: const Icon(Icons.warning_amber_rounded, color: AppColors.red, size: 20),
                         ),
                         const SizedBox(width: 12),
@@ -332,7 +335,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
               gradient: LinearGradient(
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
-                colors: [AppColors.purple.withOpacity(0.28), AppColors.purple.withOpacity(0.02)],
+                colors: [AppColors.purple.withValues(alpha: 0.28), AppColors.purple.withValues(alpha: 0.02)],
               ),
             ),
             spots: List.generate(counts.length, (i) => FlSpot(i.toDouble(), counts[i])),
@@ -376,7 +379,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
         width: 34,
         height: 34,
         alignment: Alignment.center,
-        decoration: BoxDecoration(color: color.withOpacity(0.14), borderRadius: BorderRadius.circular(10)),
+        decoration: BoxDecoration(color: color.withValues(alpha: 0.14), borderRadius: BorderRadius.circular(10)),
         child: Text(emoji, style: const TextStyle(fontSize: 15)),
       ),
       title: Text(headline, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700), maxLines: 1, overflow: TextOverflow.ellipsis),
@@ -406,37 +409,38 @@ class _MetricCard extends StatelessWidget {
   final String value;
   final String? subtitle;
   final VoidCallback? onTap;
-  const _MetricCard({required this.icon, required this.label, required this.value, this.subtitle, this.onTap});
+  const _MetricCard({required this.icon, required this.label, required this.value, this.subtitle}) : onTap = null;
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.all(14),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         decoration: BoxDecoration(
           color: context.surfaces.card2,
           borderRadius: BorderRadius.circular(16),
-          boxShadow: [BoxShadow(color: AppColors.purple.withOpacity(0.06), blurRadius: 10, offset: const Offset(0, 4))],
+          boxShadow: [BoxShadow(color: AppColors.purple.withValues(alpha: 0.06), blurRadius: 10, offset: const Offset(0, 4))],
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
           children: [
             Container(
-              width: 34,
-              height: 34,
+              width: 30,
+              height: 30,
               alignment: Alignment.center,
-              decoration: BoxDecoration(color: AppColors.purple.withOpacity(0.14), borderRadius: BorderRadius.circular(10)),
-              child: Icon(icon, color: AppColors.purple, size: 17),
+              decoration: BoxDecoration(color: AppColors.purple.withValues(alpha: 0.14), borderRadius: BorderRadius.circular(9)),
+              child: Icon(icon, color: AppColors.purple, size: 15),
             ),
-            const SizedBox(height: 8),
-            Text(label, style: TextStyle(color: context.surfaces.textDim, fontSize: 11.5), maxLines: 1, overflow: TextOverflow.ellipsis),
+            const SizedBox(height: 6),
+            Text(label, style: TextStyle(color: context.surfaces.textDim, fontSize: 11), maxLines: 1, overflow: TextOverflow.ellipsis),
             const SizedBox(height: 2),
-            Text(value, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
+            Text(value, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
             if (subtitle != null) ...[
               const SizedBox(height: 1),
-              Text(subtitle!, style: TextStyle(color: context.surfaces.textDim, fontSize: 10.5), maxLines: 1, overflow: TextOverflow.ellipsis),
+              Text(subtitle!, style: TextStyle(color: context.surfaces.textDim, fontSize: 10), maxLines: 1, overflow: TextOverflow.ellipsis),
             ],
           ],
         ),
